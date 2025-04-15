@@ -1,0 +1,39 @@
+{
+    // --- File Associations ---
+    "files.associations": {
+      "*.sce": "scilab", // Ensure .sce files are recognized by the Scilab extension
+      "*.sci": "scilab"  // Ensure .sci files are recognized
+    },
+  
+    // --- Editor Formatting ---
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true, // Use spaces instead of tabs
+    "editor.renderWhitespace": "boundary", // Show whitespace characters where lines differ (helps avoid mixing tabs/spaces)
+    "editor.detectIndentation": false, // Enforce the settings above
+  
+    // --- Files ---
+    "files.encoding": "utf8", // Ensure consistent file encoding
+    "files.trimTrailingWhitespace": true, // Automatically remove trailing whitespace on save
+    "files.insertFinalNewline": true, // Ensure files end with a newline
+  
+    // --- Search Exclusions ---
+    // Add patterns for folders/files you want to exclude from search results
+    "search.exclude": {
+      "**/node_modules": true, // Example if you ever used Node tools
+      "**/bower_components": true, // Example
+      "**/*.log": true
+    },
+  
+    // --- Git ---
+    "git.autofetch": true, // Automatically fetch from remote periodically
+  
+    // --- Scilab Specific (if the extension supports settings) ---
+    // Example: Check the Scilab extension's documentation for available settings
+    // "scilab.executablePath": "C:/Program Files/scilab-x.y.z/bin/WScilex-cli.exe", // Might be needed for linting/running if supported
+  
+    // --- Markdown ---
+    "[markdown]": {
+       "editor.wordWrap": "on", // Wrap lines in Markdown files
+       "files.trimTrailingWhitespace": false // Often disabled for Markdown
+    }
+  }
