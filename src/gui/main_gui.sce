@@ -105,10 +105,13 @@ function main_gui()
                            'layout', 'gridbag');
     app.handles.timeFrame = hTimeFrame;
 
+    // Inside main_gui.sce, modify the axes creation section:
+
     // --- Create Plot Axes ---
     // Inside Frequency Panel
     cAxMag = createConstraints("gridbag", [1, 1, 1, 1], [1, 1], "both"); // Fill cell 1,1
     axMag = newaxes(hFreqFrame); // Create axes with freqFrame as parent
+    axMag.tag = "bode_mag_axes"; // Add tag for easier finding
     axMag.axes_bounds = [0.1, 0.1, 0.85, 0.85]; // Relative position within parent (adjust as needed)
     axMag.margins = [0.1, 0.1, 0.1, 0.1]; // Margins within the axes bounds
     axMag.constraints = cAxMag; // Apply gridbag constraints
@@ -116,10 +119,13 @@ function main_gui()
     axMag.y_label.text = "Magnitude [dB]";
     axMag.x_label.text = "Frequency [Hz]"; // Initially hidden by lower plot
     axMag.grid = [color("lightGray") color("lightGray")]; // Set grid color
-    app.handles.axMag = axMag; // Store handle
+    disp("Created Magnitude axes with handle: ");
+    disp(axMag);
+    app.handles.axMag = axMag; // Store handle with explicit structure assignment
 
     cAxPhase = createConstraints("gridbag", [1, 2, 1, 1], [1, 1], "both"); // Fill cell 1,2
     axPhase = newaxes(hFreqFrame);
+    axPhase.tag = "bode_phase_axes"; // Add tag for easier finding
     axPhase.axes_bounds = [0.1, 0.1, 0.85, 0.85];
     axPhase.margins = [0.1, 0.1, 0.1, 0.1];
     axPhase.constraints = cAxPhase;
@@ -127,11 +133,14 @@ function main_gui()
     axPhase.y_label.text = "Phase [deg]";
     axPhase.x_label.text = "Frequency [Hz]";
     axPhase.grid = [color("lightGray") color("lightGray")];
-    app.handles.axPhase = axPhase;
+    disp("Created Phase axes with handle: ");
+    disp(axPhase);
+    app.handles.axPhase = axPhase; // Store handle
 
     // Inside Time Panel
     cAxTime = createConstraints("gridbag", [1, 1, 1, 1], [1, 1], "both"); // Fill cell 1,1
     axTime = newaxes(hTimeFrame);
+    axTime.tag = "time_response_axes"; // Add tag for easier finding
     axTime.axes_bounds = [0.1, 0.1, 0.85, 0.85];
     axTime.margins = [0.1, 0.1, 0.1, 0.1];
     axTime.constraints = cAxTime;
@@ -139,7 +148,14 @@ function main_gui()
     axTime.y_label.text = "Output";
     axTime.x_label.text = "Time [s]";
     axTime.grid = [color("lightGray") color("lightGray")];
-    app.handles.axTime = axTime;
+    disp("Created Time axes with handle: ");
+    disp(axTime);
+    app.handles.axTime = axTime; // Store handle
+
+    // Debug the app.handles structure after adding axes
+    disp("app.handles after adding axes:");
+    fieldnames = fieldnames(app.handles);
+    disp(fieldnames);
 
     // --- Populate Panels with Controls (Example for Plant Panel) ---
     // This part will involve calling functions like createPlantPanel defined below
