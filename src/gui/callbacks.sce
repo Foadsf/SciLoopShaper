@@ -7,20 +7,55 @@ function handle_plant_selection()
     global app; // Use the global application state
 
     try
+        // Ensure the create_example_plant function is available
+        if ~exists('create_example_plant') then
+            disp("Loading plant functions...");
+            // Directly execute the plant.sce file
+            currentPath = get_absolute_file_path('callbacks.sce');
+            plant_path = fullfile(currentPath, '..', 'core', 'plant.sce');
+            if isfile(plant_path) then
+                exec(plant_path, 0);
+                disp("Plant functions loaded.");
+            else
+                error("Could not find plant.sce file at: " + plant_path);
+            end
+        end
+
         // Find the popup menu handle using its Tag
         h = findobj('Tag', 'plantExamplesPopup');
-        if isempty(h) | ~ishandle(h) then
+        if isempty(h) then
             error("Could not find plantExamplesPopup handle.");
         end
 
         // Get selected index and the list of strings
         idx = get(h, 'value');
         strList = get(h, 'string');
-        items = tokens(strList, '|'); // Split the string by '|'
+
+        // Debug info
+        disp("Popup menu selected index: " + string(idx));
+        disp("String list type: " + typeof(strList));
+        disp("String list size: " + string(size(strList)));
+        disp("String list content: ");
+        disp(strList);
+
+        // Handle the string list properly - it might be a vector or a single string with delimiters
+        if type(strList) == 10 then // It's a string or string matrix
+            if size(strList, '*') == 1 then // Single string with delimiters
+                items = tokens(strList, '|'); // Split the string by '|'
+                disp("Tokenized items:");
+                disp(items);
+            else // Already a vector of strings
+                items = strList;
+                disp("Using string vector directly:");
+                disp(items);
+            end
+        else
+            error("Unexpected type for popup menu string list");
+        end
 
         if idx > 1 then // Index 1 is the "-- examples --" placeholder
             selectedName = items(idx);
-            disp("Selected example plant: " + selectedName);
+            disp("Selected example plant: " + string(selectedName));
 
             // Create the plant model
             app.plant = create_example_plant(selectedName);
@@ -42,10 +77,10 @@ function handle_plant_selection()
         disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         disp("Error in handle_plant_selection:");
         disp(lasterror());
-        messagebox("Error loading example plant: " + lasterror(), "Plant Selection Error", "error");
+        // Use a simpler error notification since messagebox might cause issues
+        disp("Error loading example plant: " + lasterror());
         disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     end
-
 endfunction
 
 function handle_freq_change()
@@ -57,7 +92,7 @@ function handle_freq_change()
     try
         // --- Get Min Frequency ---
         hMin = findobj('Tag', 'freqMinEdit');
-        if ~isempty(hMin) & ishandle(hMin) then
+        if ~isempty(hMin) then
             minStr = get(hMin, 'string');
             minVal = evstr(minStr); // Convert string to number
             // Validation
@@ -75,7 +110,7 @@ function handle_freq_change()
 
         // --- Get Max Frequency ---
         hMax = findobj('Tag', 'freqMaxEdit');
-        if ~isempty(hMax) & ishandle(hMax) then
+        if ~isempty(hMax) then
             maxStr = get(hMax, 'string');
             maxVal = evstr(maxStr);
             // Validation
@@ -93,7 +128,7 @@ function handle_freq_change()
 
         // --- Get Points ---
         hPts = findobj('Tag', 'freqPointsEdit');
-        if ~isempty(hPts) & ishandle(hPts) then
+        if ~isempty(hPts) then
             ptsStr = get(hPts, 'string');
             ptsVal = evstr(ptsStr);
             // Validation (ensure integer, positive, reasonable range)
@@ -119,12 +154,9 @@ function handle_freq_change()
         disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         disp("Error in handle_freq_change:");
         disp(lasterror());
-        // Indicate error in the specific field if possible? More complex.
         disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     end
-
 endfunction
-
 
 function update_plots()
     // Main function to update all plot areas based on current app state
@@ -134,9 +166,9 @@ function update_plots()
     // --- Get Handles ---
     // Check if handles exist and are valid before using them
     axM = []; axP = []; axT = [];
-    if isdef('app.handles.axMag','l') & ishandle(app.handles.axMag) then axM = app.handles.axMag; end
-    if isdef('app.handles.axPhase','l') & ishandle(app.handles.axPhase) then axP = app.handles.axPhase; end
-    if isdef('app.handles.axTime','l') & ishandle(app.handles.axTime) then axT = app.handles.axTime; end
+    if isdef('app.handles.axMag','l') then axM = app.handles.axMag; end
+    if isdef('app.handles.axPhase','l') then axP = app.handles.axPhase; end
+    if isdef('app.handles.axTime','l') then axT = app.handles.axTime; end
 
     // --- Update Frequency Domain Plot (Bode for now) ---
     if ~isempty(axM) & ~isempty(axP) then // Check if axes handles are valid
@@ -152,8 +184,11 @@ function update_plots()
                 plot_bode(app.plant, app.freq.min, app.freq.max, app.freq.points, '-', 'b', axM, axP);
 
                 // Try setting grid again AFTER plotting
-                axM.grid = [color("light gray") color("light gray")];
-                axP.grid = [color("light gray") color("light gray")];
+                axM.grid = [color("lightGray") color("lightGray")];
+                axP.grid = [color("lightGray") color("lightGray")];
+
+                // Add title
+                xtitle(axM, "Plant Frequency Response");
 
                 disp("Bode plot updated.");
             catch
@@ -161,19 +196,17 @@ function update_plots()
                 disp("Error calling plot_bode:");
                 disp(lasterror());
                 xtitle(axM, "Error plotting Bode!"); // Display error on plot
-                 axM.grid = [color("light gray") color("light gray")]; // Still add grid
-                 axP.grid = [color("light gray") color("light gray")];
-                 disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                axM.grid = [color("lightGray") color("lightGray")]; // Still add grid
+                axP.grid = [color("lightGray") color("lightGray")];
+                disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             end
         else
             disp("No valid plant loaded, clearing Bode plot.");
             // Optional: Add text to indicate no plot
             xtitle(axM, "No Plant Loaded");
-            axM.grid = [color("light gray") color("light gray")]; // Still add grid
-            axP.grid = [color("light gray") color("light gray")];
+            axM.grid = [color("lightGray") color("lightGray")]; // Still add grid
+            axP.grid = [color("lightGray") color("lightGray")];
         end
-        // Ensure axes are redrawn
-        // drawaxes(axM); drawaxes(axP); // Might not be needed if cla works well
     else
         disp("Warning: Magnitude/Phase axes handles not found or invalid.");
     end
@@ -183,21 +216,43 @@ function update_plots()
          cla(axT); // Clear previous plot
          disp("Time plot cleared (implementation TBD).");
          xtitle(axT, "Time Response (TBD)");
-         axT.grid = [color("light gray") color("light gray")];
+         axT.grid = [color("lightGray") color("lightGray")];
      else
         disp("Warning: Time axis handle not found or invalid.");
      end
+endfunction
 
-    // --- Update Performance Display (Placeholder) ---
-    // Find handles for performance text fields and update their 'string' property
-    // E.g., hBw = findobj('Tag', 'perfBwValue'); set(hBw, 'string', string(app.results.bandwidth));
-    disp("Performance display update TBD.");
+function handle_load_plant_ws()
+    // Callback for the "From Workspace" button
+    disp("Callback: handle_load_plant_ws triggered."); // Debug
+    global app;
 
+    try
+        // Show input dialog to get variable name
+        variableName = x_dialog("Enter the name of the plant variable in the Scilab workspace:", "");
+
+        if variableName <> [] & variableName <> "" then
+            disp("Loading plant from workspace: " + variableName);
+
+            // Try to load the plant from workspace
+            app.plant = load_plant_from_workspace(variableName);
+
+            // Update the plots
+            update_plots();
+        else
+            disp("Load from workspace canceled.");
+        end
+    catch
+        disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        disp("Error in handle_load_plant_ws:");
+        disp(lasterror());
+        messagebox("Error loading plant from workspace: " + lasterror(), "Load Error", "error");
+        disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    end
 endfunction
 
 
 // --- Add other callbacks below as needed ---
-// function handle_load_plant_ws() ... endfunction
 // function handle_load_plant_file() ... endfunction
 // function handle_controller_add() ... endfunction
 // function handle_controller_remove() ... endfunction

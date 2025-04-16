@@ -64,13 +64,40 @@ for i = 1:size(func_files, 1)
     end
 end
 
+// In main.sce, modify the section after loading files:
+
 if errored then
     error("SciLoopShaper failed to load necessary function files.");
 else
     disp("SciLoopShaper functions loaded successfully.");
 
-    // Force a global redefinition of main_gui if it exists in the file
+    // Force a global redefinition of core functions, callbacks, and main_gui
+    plant_path = fullfile(currentPath, 'src', 'core', 'plant.sce');
+    controller_path = fullfile(currentPath, 'src', 'core', 'controller.sce');
+    analysis_path = fullfile(currentPath, 'src', 'core', 'analysis.sce');
+    bode_plots_path = fullfile(currentPath, 'src', 'plots', 'bode_plots.sce');
+    callbacks_path = fullfile(currentPath, 'src', 'gui', 'callbacks.sce');
     main_gui_path = fullfile(currentPath, 'src', 'gui', 'main_gui.sce');
+
+    // Load core functions first
+    core_files = [plant_path, controller_path, analysis_path, bode_plots_path];
+    for i = 1:size(core_files, 1)
+        if isfile(core_files(i)) then
+            disp("Reloading core file: " + core_files(i));
+            exec(core_files(i), 0);
+        else
+            disp("Warning: Could not find core file: " + core_files(i));
+        end
+    end
+
+    // Then load callbacks and main_gui
+    if isfile(callbacks_path) then
+        disp("Reloading callback functions to ensure global scope...");
+        exec(callbacks_path, 0);
+    else
+        disp("Warning: Could not find callbacks.sce file.");
+    end
+
     if isfile(main_gui_path) then
         disp("Reloading main_gui function to ensure global scope...");
         exec(main_gui_path, 0);

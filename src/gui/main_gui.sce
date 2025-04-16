@@ -182,8 +182,8 @@ function createPlantPanelControls(parentHandle)
                          'constraints', cPopupEx);
     app.handles.plantPopup = hPlantEx; // Store handle if needed later
 
-    // Workspace/File Buttons (Placeholders)
-    hPlantWs = uicontrol(parentHandle, 'style', 'pushbutton', 'string', 'From Workspace', 'Tag', 'plantWsButton', 'constraints', cBtnWs);
+    // Workspace/File Buttons
+    hPlantWs = uicontrol(parentHandle, 'style', 'pushbutton', 'string', 'From Workspace', 'Tag', 'plantWsButton', 'constraints', cBtnWs, 'callback', 'handle_load_plant_ws()');
     hPlantFile = uicontrol(parentHandle, 'style', 'pushbutton', 'string', 'From File', 'Tag', 'plantFileButton', 'constraints', cBtnFile);
     app.handles.plantWsBtn = hPlantWs;
     app.handles.plantFileBtn = hPlantFile;
