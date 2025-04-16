@@ -1,29 +1,20 @@
+// File: src/gui/callbacks.sce
 // SciLoopShaper - GUI Callback Functions
 // Released under GPL - see LICENSE file for details
 
+// Declare ALL globals needed by the callback functions
+global app;
+global ghAxMag ghAxPhase ghAxTime; // Handles stored separately
+
 function handle_plant_selection()
-    // Callback for the plant examples popup menu
+    global app; // Ensure access to global app state
+    global ghAxMag ghAxPhase ghAxTime; // Ensure access to global axes handles
     disp("Callback: handle_plant_selection triggered."); // Debug
-    global app; // Use the global application state
 
     try
-        // Ensure the create_example_plant function is available
-        if ~exists('create_example_plant') then
-            disp("Loading plant functions...");
-            // Directly execute the plant.sce file
-            currentPath = get_absolute_file_path('callbacks.sce');
-            plant_path = fullfile(currentPath, '..', 'core', 'plant.sce');
-            if isfile(plant_path) then
-                exec(plant_path, 0);
-                disp("Plant functions loaded.");
-            else
-                error("Could not find plant.sce file at: " + plant_path);
-            end
-        end
-
         // Find the popup menu handle using its Tag
         h = findobj('Tag', 'plantExamplesPopup');
-        if isempty(h) then
+        if isempty(h) then // Use isempty for checking findobj result
             error("Could not find plantExamplesPopup handle.");
         end
 
@@ -31,42 +22,33 @@ function handle_plant_selection()
         idx = get(h, 'value');
         strList = get(h, 'string');
 
-        // Debug info
-        disp("Popup menu selected index: " + string(idx));
-        disp("String list type: " + typeof(strList));
-        disp("String list size: " + string(size(strList)));
-        disp("String list content: ");
-        disp(strList);
-
-        // Handle the string list properly - it might be a vector or a single string with delimiters
+        // Handle the string list properly
+        items = []; // Initialize
         if type(strList) == 10 then // It's a string or string matrix
             if size(strList, '*') == 1 then // Single string with delimiters
-                items = tokens(strList, '|'); // Split the string by '|'
-                disp("Tokenized items:");
-                disp(items);
-            else // Already a vector of strings
-                items = strList;
-                disp("Using string vector directly:");
-                disp(items);
+                items = tokens(strList, '|');
+            else // Already a vector/matrix of strings
+                items = matrix(strList, -1, 1); // Ensure it's a column vector
             end
         else
             error("Unexpected type for popup menu string list");
         end
+        disp("Popup Items:"); disp(items);
+        disp("Selected Index: " + string(idx));
 
-        if idx > 1 then // Index 1 is the "-- examples --" placeholder
+        if idx > 1 & idx <= size(items, '*') then // Index 1 is placeholder, check upper bound
             selectedName = items(idx);
             disp("Selected example plant: " + string(selectedName));
 
             // Create the plant model
+            // Ensure create_example_plant is loaded (main.sce should handle this)
+            if ~exists('create_example_plant') then error("Function create_example_plant not loaded!"); end
             app.plant = create_example_plant(selectedName);
             disp("Plant model created/updated.");
 
-            // Reset frequency range to defaults maybe? Or keep user values?
-            // Let's keep user values for now unless plant explicitly loaded
-
         else
-            // User selected the "-- examples --" placeholder or list is empty
-            disp("No example plant selected.");
+            // User selected the "-- examples --" placeholder or index out of bounds
+            disp("No valid example plant selected.");
             app.plant = []; // Clear the current plant
         end
 
@@ -77,34 +59,39 @@ function handle_plant_selection()
         disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         disp("Error in handle_plant_selection:");
         disp(lasterror());
-        // Use a simpler error notification since messagebox might cause issues
+        // messagebox might interfere with GUI updates, use console msg for now
         disp("Error loading example plant: " + lasterror());
         disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     end
+
 endfunction
 
 function handle_freq_change()
-    // Callback for frequency range edit boxes
+    global app; // Ensure access to global app state
+    global ghAxMag ghAxPhase ghAxTime; // Ensure access to global axes handles
     disp("Callback: handle_freq_change triggered."); // Debug
-    global app;
     needs_update = %F; // Flag to replot only if values change and are valid
+    current_min = app.freq.min; // Store initial values for comparison
+    current_max = app.freq.max;
+    current_pts = app.freq.points;
 
     try
+        valid_min = %F; valid_max = %F; valid_pts = %F;
+        new_min = current_min; new_max = current_max; new_pts = current_pts;
+
         // --- Get Min Frequency ---
         hMin = findobj('Tag', 'freqMinEdit');
         if ~isempty(hMin) then
             minStr = get(hMin, 'string');
-            minVal = evstr(minStr); // Convert string to number
-            // Validation
-            if typeof(minVal) == 1 & size(minVal,"*")==1 & minVal > 0 & minVal < app.freq.max then
-                if app.freq.min <> minVal then // Check if value actually changed
-                    app.freq.min = minVal;
-                    set(hMin, 'foregroundcolor', [0 0 0]); // Black text for valid
-                     needs_update = %T;
-                end
+            minVal = evstr(minStr);
+            // Validation (must be number > 0)
+            if typeof(minVal) == 1 & size(minVal,"*")==1 & minVal > 0 then
+                new_min = minVal;
+                valid_min = %T;
+                set(hMin, 'foregroundcolor', [0 0 0]); // Black text for potentially valid
             else
-                set(hMin, 'foregroundcolor', [1 0 0]); // Red text for invalid
-                disp("Invalid Min Frequency value entered.");
+                set(hMin, 'foregroundcolor', [1 0 0]); // Red text for invalid syntax/type
+                disp("Invalid Min Frequency value entered (syntax/type).");
             end
         end
 
@@ -113,16 +100,14 @@ function handle_freq_change()
         if ~isempty(hMax) then
             maxStr = get(hMax, 'string');
             maxVal = evstr(maxStr);
-            // Validation
-            if typeof(maxVal) == 1 & size(maxVal,"*")==1 & maxVal > 0 & maxVal > app.freq.min then
-                 if app.freq.max <> maxVal then
-                    app.freq.max = maxVal;
-                    set(hMax, 'foregroundcolor', [0 0 0]);
-                    needs_update = %T;
-                end
+            // Validation (must be number > 0)
+            if typeof(maxVal) == 1 & size(maxVal,"*")==1 & maxVal > 0 then
+                 new_max = maxVal;
+                 valid_max = %T;
+                 set(hMax, 'foregroundcolor', [0 0 0]);
             else
                 set(hMax, 'foregroundcolor', [1 0 0]);
-                 disp("Invalid Max Frequency value entered.");
+                disp("Invalid Max Frequency value entered (syntax/type).");
             end
         end
 
@@ -133,182 +118,153 @@ function handle_freq_change()
             ptsVal = evstr(ptsStr);
             // Validation (ensure integer, positive, reasonable range)
             if typeof(ptsVal)==1 & size(ptsVal,"*")==1 & ptsVal > 0 & ptsVal == round(ptsVal) & ptsVal < 50000 then
-                 if app.freq.points <> ptsVal then
-                    app.freq.points = ptsVal;
-                    set(hPts, 'foregroundcolor', [0 0 0]);
-                     needs_update = %T;
-                end
+                new_pts = ptsVal;
+                valid_pts = %T;
+                set(hPts, 'foregroundcolor', [0 0 0]);
             else
                 set(hPts, 'foregroundcolor', [1 0 0]);
                 disp("Invalid Points value entered (must be positive integer).");
             end
         end
 
+        // --- Cross-Validation and Update ---
+        if valid_min & valid_max & valid_pts then
+            // Check min < max
+            if new_min >= new_max then
+                disp("Validation Error: Min Frequency must be less than Max Frequency.");
+                // Optionally set both back to red
+                if ishandle(hMin) then set(hMin, 'foregroundcolor', [1 0 0]); end
+                if ishandle(hMax) then set(hMax, 'foregroundcolor', [1 0 0]); end
+            else
+                 // All valid, check if any value actually changed
+                if app.freq.min <> new_min | app.freq.max <> new_max | app.freq.points <> new_pts then
+                    app.freq.min = new_min;
+                    app.freq.max = new_max;
+                    app.freq.points = new_pts;
+                    needs_update = %T;
+                    disp("Frequency range updated.");
+                end
+                 // Set color back to black if valid but unchanged (user might just press Enter)
+                if ishandle(hMin) then set(hMin, 'foregroundcolor', [0 0 0]); end
+                if ishandle(hMax) then set(hMax, 'foregroundcolor', [0 0 0]); end
+                if ishandle(hPts) then set(hPts, 'foregroundcolor', [0 0 0]); end
+            end
+        end
+
+
         // --- Update Plots if necessary ---
         if needs_update then
-            disp("Frequency range updated. Calling update_plots().");
+            disp("Calling update_plots() due to frequency change.");
             update_plots();
         end
 
     catch
         disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         disp("Error in handle_freq_change:");
+        // This catch might grab errors from evstr if input is totally invalid
         disp(lasterror());
+        // Maybe indicate which field had the error?
         disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     end
+
 endfunction
 
 function update_plots()
     // Main function to update all plot areas based on current app state
-    disp("Callback: update_plots triggered."); // Debug
-    global app;
-
-    // Debug app.handles structure
-    disp("Debugging app.handles structure:");
-    try
-        if ~isdef('app.handles', 'l') then
-            disp("app.handles is not defined");
-        else
-            disp("app.handles fields:");
-            fieldnames = fieldnames(app.handles);
-            disp(fieldnames);
-
-            if isfield(app.handles, 'axMag') then
-                disp("axMag is present in app.handles");
-                axMag_info = app.handles.axMag;
-                disp("axMag type: " + typeof(axMag_info));
-            else
-                disp("axMag is NOT present in app.handles");
-            end
-
-            if isfield(app.handles, 'axPhase') then
-                disp("axPhase is present in app.handles");
-                axPhase_info = app.handles.axPhase;
-                disp("axPhase type: " + typeof(axPhase_info));
-            else
-                disp("axPhase is NOT present in app.handles");
-            end
-        end
-    catch
-        disp("Error inspecting app.handles: " + lasterror());
-    end
-
-    // --- Get Handles ---
-    // Try different approaches to get the axes handles
-    axM = []; axP = []; axT = [];
-
-    // Approach 1: Direct from app.handles
-    try
-        if isfield(app.handles, 'axMag') then
-            axM = app.handles.axMag;
-            disp("Got axMag handle from app.handles - type: " + typeof(axM));
-        end
-        if isfield(app.handles, 'axPhase') then
-            axP = app.handles.axPhase;
-            disp("Got axPhase handle from app.handles - type: " + typeof(axP));
-        end
-        if isfield(app.handles, 'axTime') then
-            axT = app.handles.axTime;
-            disp("Got axTime handle from app.handles - type: " + typeof(axT));
-        end
-    catch
-        disp("Error accessing handles from app.handles: " + lasterror());
-    end
-
-    // Approach 2: Find by tag if approach 1 failed
-    if isempty(axM) then
-        try
-            axM = findobj('tag', 'bode_mag_axes');
-            if ~isempty(axM) then
-                disp("Found axMag by tag");
-            end
-        catch
-            disp("Error finding axMag by tag: " + lasterror());
-        end
-    end
-
-    if isempty(axP) then
-        try
-            axP = findobj('tag', 'bode_phase_axes');
-            if ~isempty(axP) then
-                disp("Found axPhase by tag");
-            end
-        catch
-            disp("Error finding axPhase by tag: " + lasterror());
-        end
-    end
+    global app; // Need app for state
+    global ghAxMag ghAxPhase ghAxTime; // Access handles directly
+    disp("Callback: update_plots triggered.");
 
     // --- Update Frequency Domain Plot (Bode for now) ---
-    if ~isempty(axM) & ~isempty(axP) then // Check if axes handles are valid
-        disp("Both axes handles found, attempting to plot...");
-
-        // Clear previous plots on these specific axes
+    // Fix: Use typeof() == "handle" instead of ishandle()
+    if isdef('ghAxMag') & typeof(ghAxMag) == "handle" & isdef('ghAxPhase') & typeof(ghAxPhase) == "handle" then
+        disp("Mag/Phase global axes handles seem valid (type check), attempting to update...");
         try
-            cla(axM);
-            cla(axP);
-            disp("Successfully cleared axes");
+            // Clear previous plots using delete(children)
+            // Add check if children exist before deleting
+            if ~isempty(ghAxMag.children) then delete(ghAxMag.children); end
+            if ~isempty(ghAxPhase.children) then delete(ghAxPhase.children); end
+            disp("Successfully cleared freq axes content (if any).");
         catch
-            disp("Error clearing axes: " + lasterror());
+            disp("Warning: Error clearing freq axes children: " + lasterror());
         end
 
         // Check if a valid plant exists
-        if isdef('app.plant','l') & ~isempty(app.plant) & typeof(app.plant) == "rational" then
+        plant_exists_and_valid = %F; // Flag
+        if isdef('app','l') & isfield(app,'plant') & ~isempty(app.plant) then
+            disp("Type of app.plant: " + typeof(app.plant));
+             if typeof(app.plant) == "rational" | typeof(app.plant) == "state-space" then
+                 plant_exists_and_valid = %T;
+             end
+        end
+
+        if plant_exists_and_valid then
             disp("Plotting Bode for current plant...");
             try
-                // Call the modified plot_bode function, passing axes handles
-                plot_bode(app.plant, app.freq.min, app.freq.max, app.freq.points, '-', 'b', axM, axP);
-                disp("plot_bode called successfully");
+                 if ~exists('plot_bode') then error("Function plot_bode not loaded!"); end
+                 plot_bode(app.plant, app.freq.min, app.freq.max, app.freq.points, '-', 'b', ghAxMag, ghAxPhase);
+                 disp("plot_bode called successfully");
 
-                // Try setting grid again AFTER plotting
-                axM.grid = [color("lightGray") color("lightGray")];
-                axP.grid = [color("lightGray") color("lightGray")];
+                 ghAxMag.grid = [color("lightGray") color("lightGray")];
+                 ghAxPhase.grid = [color("lightGray") color("lightGray")];
+                 xtitle(ghAxMag, "Plant Frequency Response");
 
-                // Add title
-                xtitle(axM, "Plant Frequency Response");
-
-                disp("Bode plot updated.");
+                 disp("Bode plot updated.");
             catch
                 disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 disp("Error calling plot_bode:");
                 disp(lasterror());
-                xtitle(axM, "Error plotting Bode!"); // Display error on plot
-                axM.grid = [color("lightGray") color("lightGray")]; // Still add grid
-                axP.grid = [color("lightGray") color("lightGray")];
-                disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                // Fix: Use typeof check before xtitle/grid
+                if typeof(ghAxMag)=="handle" then xtitle(ghAxMag, "Error plotting Bode!"); end
+                if typeof(ghAxMag)=="handle" then ghAxMag.grid = [color("lightGray") color("lightGray")]; end
+                if typeof(ghAxPhase)=="handle" then ghAxPhase.grid = [color("lightGray") color("lightGray")]; end
+                 disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             end
         else
             disp("No valid plant loaded, clearing Bode plot.");
-            // Optional: Add text to indicate no plot
-            xtitle(axM, "No Plant Loaded");
-            axM.grid = [color("lightGray") color("lightGray")]; // Still add grid
-            axP.grid = [color("lightGray") color("lightGray")];
+             // Fix: Use typeof check before xtitle/grid
+            if typeof(ghAxMag)=="handle" then
+                xtitle(ghAxMag, "No Plant Loaded");
+                ghAxMag.grid = [color("lightGray") color("lightGray")];
+            end
+            if typeof(ghAxPhase)=="handle" then
+                 xtitle(ghAxPhase, ""); // Clear potential old title
+                 ghAxPhase.grid = [color("lightGray") color("lightGray")];
+            end
         end
     else
-        disp("Warning: Magnitude/Phase axes handles not found or invalid.");
+        disp("Warning: Global Magnitude/Phase axes handles not found or invalid (type check failed) in update_plots.");
     end
 
     // --- Update Time Domain Plot (Placeholder for now) ---
-    if ~isempty(axT) then // Check if axes handle is valid
-        disp("Time axis handle found");
-        try
-            cla(axT); // Clear previous plot
-            disp("Time plot cleared (implementation TBD).");
-            xtitle(axT, "Time Response (TBD)");
-            axT.grid = [color("lightGray") color("lightGray")];
-        catch
-            disp("Error updating time plot: " + lasterror());
-        end
-    else
-       disp("Warning: Time axis handle not found or invalid.");
-    end
+     // Fix: Use typeof() == "handle" instead of ishandle()
+     if isdef('ghAxTime') & typeof(ghAxTime) == "handle" then
+         disp("Time axis handle seems valid (type check), clearing.");
+         try
+             if ~isempty(ghAxTime.children) then delete(ghAxTime.children); end // Check children before delete
+             disp("Time plot cleared.");
+             xtitle(ghAxTime, "Time Response (TBD)");
+             ghAxTime.grid = [color("lightGray") color("lightGray")];
+         catch
+             disp("Warning: Error updating time plot: " + lasterror());
+         end
+     else
+        disp("Warning: Global Time axis handle not found or invalid (type check failed) in update_plots.");
+     end
+
 endfunction
+
 
 function handle_load_plant_ws()
     // Callback for the "From Workspace" button
+    global app; // Ensure access to global app state
+    global ghAxMag ghAxPhase ghAxTime; // Make sure handles are accessible if needed
     disp("Callback: handle_load_plant_ws triggered."); // Debug
-    global app;
 
     try
+        // Ensure core function is loaded
+        if ~exists('load_plant_from_workspace') then error("Function load_plant_from_workspace not loaded!"); end
+
         // Show input dialog to get variable name
         variableName = x_dialog("Enter the name of the plant variable in the Scilab workspace:", "");
 
@@ -317,6 +273,7 @@ function handle_load_plant_ws()
 
             // Try to load the plant from workspace
             app.plant = load_plant_from_workspace(variableName);
+            disp("Plant loaded from workspace.");
 
             // Update the plots
             update_plots();

@@ -168,3 +168,5 @@ function plot_nichols(sys, w_min, w_max, n_points, line_style, line_color)
     a.grid = [1 1];     // << Set grid LAST
 
 endfunction
+
+disp("--- src/plots/bode_plots.sce finished execution. plot_bode should be defined. ---");

@@ -1,243 +1,208 @@
 function main_gui()
     // Creates the main SciLoopShaper GUI window and layout
 
-    // Prevent potential re-execution issues if already open
-    h = findobj("figure_name", "SciLoopShaper");
+    // --- Declare Globals ---
+    global app; // For state data
+    global ghAxMag ghAxPhase ghAxTime; // Separate globals for critical axes handles
+
+    // Initialize global app state (if needed) - keep previous logic
+    app_initialized = %F; // Flag to track if we initialized it here
+    try
+        temp_app = getglobal('app');
+        if typeof(temp_app) == "struct" then
+            disp("Global app structure already exists.");
+            app = temp_app;
+            // Ensure handles SUB-STRUCT doesn't exist from previous runs if we aren't using it
+            if isfield(app, 'handles') then
+                 app = rmfield(app, 'handles'); // Remove old handles struct if present
+            end
+        else
+            error("Global ''app'' exists but is not a struct. Re-initializing.");
+        end
+    catch
+        disp("Initializing global app structure (without .handles)...");
+        app = struct();
+        app.plant = [];
+        app.controllers = list();
+        app.activeController = 1;
+        app.showController = [%T, %F, %F];
+        app.freq = struct('min', 0.1, 'max', 1000, 'points', 2000);
+        app.sampleTime = 0.001;
+        app.showDiscrete = %F;
+        app.plotType = 'bode';
+        // app.handles = struct(); // << DO NOT Initialize handles sub-struct
+        app_initialized = %T;
+    end
+    // --- End Initialization ---
+
+
+    // Prevent re-execution issues (using tag is probably best)
+    h = findobj("Tag", "SciLoopShaper_mainFig");
     if ~isempty(h) then
-        disp("SciLoopShaper window already open. Closing existing one.");
-        delete(h); // or close(h);
+        disp("SciLoopShaper window tag found. Closing existing one.");
+        delete(h);
     end
 
-    // Initialize global data structure to store application state
-    global app;
-    if ~isdef('app','l') | typeof(app) <> "struct" then // Initialize if not exists
-        app = struct();
-        app.plant = [];             // Current plant model (syslin or FRD struct)
-        app.controllers = list();   // List containing controller definition lists (list of lists of block structs)
-        app.activeController = 1;   // Currently active controller (1, 2, or 3)
-        app.showController = [%T, %F, %F]; // Which controllers to display
-        app.freq = struct('min', 0.1, 'max', 1000, 'points', 2000); // Frequency range defaults
-        app.sampleTime = 0.001;     // Default sample time
-        app.showDiscrete = %F;      // Show discrete controller flag
-        app.plotType = 'bode';      // Current plot type (bode, nyquist, nichols, time)
-        app.handles = struct();     // Sub-struct to store GUI element handles
-    end
 
     // --- Main Figure Creation ---
-    fig = figure(); // Create a new figure window
-    app.handles.fig = fig; // Store figure handle
+    fig = figure();
+    fig.tag = "SciLoopShaper_mainFig"; // Use tag for finding later
 
-    // Set figure properties
+    // Set figure properties (use 'fig' handle)
     fig.figure_name     = 'SciLoopShaper';
-    fig.figure_position = [100, 100]; // Just position, not size
-    fig.figure_size     = [950, 700]; // Size as separate property
+    fig.figure_position = [100, 100];
+    fig.figure_size     = [950, 700];
     fig.dockable        = 'off';
     fig.infobar_visible = 'off';
-    fig.toolbar_visible = 'off'; // Disable default toolbar
-    fig.menubar_visible = 'off'; // Disable default menubar
-    fig.default_axes    = 'off'; // Don't create default axes automatically
-    fig.resize          = 'on';  // Allow resizing
+    fig.toolbar_visible = 'off';
+    fig.menubar_visible = 'off';
+    fig.default_axes    = 'off';
+    fig.resize          = 'on';
 
-    // Set main layout: Border allows North/South/East/West/Center placement
+    // Set main layout: Border
     fig.layout          = 'border';
-    // Optional padding between regions [width, height]
-    // fig.layout_options = createLayoutOptions("border", [5, 5]);
+    // fig.layout_options = createLayoutOptions("border", [5, 5]); // Optional padding
 
     // --- Create Main Panels (Frames) ---
+    // Store handles locally if needed or maybe in app struct if non-axes handles are safe
+    cLeft = createConstraints("border", "left", [350, 0]);
+    hLeftPanel = uicontrol(fig, 'style', 'frame', 'constraints', cLeft, 'backgroundcolor', [0.9 0.9 0.9], 'layout', 'gridbag');
 
-    // Left Panel (for Controls)
-    // Takes a fixed width on the left, fills vertically
-    cLeft = createConstraints("border", "left", [350, 0]); // Width=350
-    hLeftPanel = uicontrol(fig, 'style', 'frame', ...
-                           'constraints', cLeft, ...
-                           'backgroundcolor', [0.9 0.9 0.9], ... // Light gray
-                           'layout', 'gridbag'); // Use gridbag for contents
-    app.handles.leftPanel = hLeftPanel;
-
-    // Right Panel (for Plots)
-    // Takes the remaining central space
     cRight = createConstraints("border", "center");
-    hRightPanel = uicontrol(fig, 'style', 'frame', ...
-                            'constraints', cRight, ...
-                            'backgroundcolor', [0.85 0.85 0.85], ... // Slightly darker gray
-                            'layout', 'gridbag'); // Use gridbag for contents
-    app.handles.rightPanel = hRightPanel;
+    hRightPanel = uicontrol(fig, 'style', 'frame', 'constraints', cRight, 'backgroundcolor', [0.85 0.85 0.85], 'layout', 'gridbag');
 
     // --- Create Sub-Panels within Left Panel ---
-    // Plant Panel (Top)
-    cPlant = createConstraints("gridbag", [1, 1, 1, 1], [1, 0.3], "both"); // Grid 1,1 ; Weight Y=0.3; Fill both
-    hPlantFrame = uicontrol(hLeftPanel, 'style', 'frame', ...
-                             'constraints', cPlant, ...
-                             'border', createBorder("titled", createBorder("line", "lightGray", 1), "PLANT", "left", "above_top"), ...
-                             'layout', 'gridbag'); // Gridbag for controls inside
-    app.handles.plantFrame = hPlantFrame;
+    cPlant = createConstraints("gridbag", [1, 1, 1, 1], [1, 0.3], "both");
+    hPlantFrame = uicontrol(hLeftPanel, 'style', 'frame', 'constraints', cPlant, 'border', createBorder("titled", createBorder("line", "lightGray", 1), "PLANT", "left", "above_top"), 'layout', 'gridbag');
 
-    // Controller Panel (Middle)
-    cCtrl = createConstraints("gridbag", [1, 2, 1, 1], [1, 0.5], "both"); // Grid 1,2 ; Weight Y=0.5; Fill both
-    hCtrlFrame = uicontrol(hLeftPanel, 'style', 'frame', ...
-                            'constraints', cCtrl, ...
-                            'border', createBorder("titled", createBorder("line", "lightGray", 1), "CONTROLLER", "left", "above_top"), ...
-                            'layout', 'gridbag');
-    app.handles.ctrlFrame = hCtrlFrame;
+    cCtrl = createConstraints("gridbag", [1, 2, 1, 1], [1, 0.5], "both");
+    hCtrlFrame = uicontrol(hLeftPanel, 'style', 'frame', 'constraints', cCtrl, 'border', createBorder("titled", createBorder("line", "lightGray", 1), "CONTROLLER", "left", "above_top"), 'layout', 'gridbag');
 
-    // Performance Panel (Bottom)
-    cPerf = createConstraints("gridbag", [1, 3, 1, 1], [1, 0.2], "both"); // Grid 1,3 ; Weight Y=0.2; Fill both
-    hPerfFrame = uicontrol(hLeftPanel, 'style', 'frame', ...
-                           'constraints', cPerf, ...
-                           'border', createBorder("titled", createBorder("line", "lightGray", 1), "PERFORMANCE", "left", "above_top"), ...
-                           'layout', 'gridbag');
-    app.handles.perfFrame = hPerfFrame;
+    cPerf = createConstraints("gridbag", [1, 3, 1, 1], [1, 0.2], "both");
+    hPerfFrame = uicontrol(hLeftPanel, 'style', 'frame', 'constraints', cPerf, 'border', createBorder("titled", createBorder("line", "lightGray", 1), "PERFORMANCE", "left", "above_top"), 'layout', 'gridbag');
 
     // --- Create Sub-Panels within Right Panel ---
-    // Frequency Response Panel (Top)
-    cFreq = createConstraints("gridbag", [1, 1, 1, 1], [1, 0.65], "both"); // Grid 1,1 ; Weight Y=0.65; Fill both
-    hFreqFrame = uicontrol(hRightPanel, 'style', 'frame', ...
-                            'constraints', cFreq, ...
-                            'border', createBorder("titled", createBorder("line", "lightGray", 1), "FREQUENCY RESPONSE", "left", "above_top"), ...
-                            'layout', 'gridbag');
-    app.handles.freqFrame = hFreqFrame;
+    cFreq = createConstraints("gridbag", [1, 1, 1, 1], [1, 0.65], "both");
+    hFreqFrame = uicontrol(hRightPanel, 'style', 'frame', 'constraints', cFreq, 'border', createBorder("titled", createBorder("line", "lightGray", 1), "FREQUENCY RESPONSE", "left", "above_top"), 'layout', 'gridbag');
 
-    // Time Response Panel (Bottom)
-    cTime = createConstraints("gridbag", [1, 2, 1, 1], [1, 0.35], "both"); // Grid 1,2 ; Weight Y=0.35; Fill both
-    hTimeFrame = uicontrol(hRightPanel, 'style', 'frame', ...
-                           'constraints', cTime, ...
-                           'border', createBorder("titled", createBorder("line", "lightGray", 1), "TIME RESPONSE", "left", "above_top"), ...
-                           'layout', 'gridbag');
-    app.handles.timeFrame = hTimeFrame;
+    cTime = createConstraints("gridbag", [1, 2, 1, 1], [1, 0.35], "both");
+    hTimeFrame = uicontrol(hRightPanel, 'style', 'frame', 'constraints', cTime, 'border', createBorder("titled", createBorder("line", "lightGray", 1), "TIME RESPONSE", "left", "above_top"), 'layout', 'gridbag');
 
-    // Inside main_gui.sce, modify the axes creation section:
+    // --- Create Plot Axes and assign to SEPARATE GLOBALS ---
+    cAxMag = createConstraints("gridbag", [1, 1, 1, 1], [1, 1], "both");
+    ghAxMag = newaxes(hFreqFrame); // Assign to global ghAxMag
+    ghAxMag.tag = "bode_mag_axes";
+    ghAxMag.constraints = cAxMag;
+    ghAxMag.axes_bounds = [0.1, 0.1, 0.85, 0.8]; // Adjust bounds slightly
+    ghAxMag.margins = [0.12, 0.1, 0.1, 0.1];
+    ghAxMag.visible = "on";
+    ghAxMag.y_label.text = "Magnitude [dB]";
+    // ghAxMag.x_label.text = "Frequency [Hz]"; // Label on bottom plot
+    ghAxMag.grid = [color("lightGray") color("lightGray")];
+    ghAxMag.auto_clear = "off"; // Prevent auto clear if needed
+    disp("Created Magnitude axes (global ghAxMag).");
 
-    // --- Create Plot Axes ---
-    // Inside Frequency Panel
-    cAxMag = createConstraints("gridbag", [1, 1, 1, 1], [1, 1], "both"); // Fill cell 1,1
-    axMag = newaxes(hFreqFrame); // Create axes with freqFrame as parent
-    axMag.tag = "bode_mag_axes"; // Add tag for easier finding
-    axMag.axes_bounds = [0.1, 0.1, 0.85, 0.85]; // Relative position within parent (adjust as needed)
-    axMag.margins = [0.1, 0.1, 0.1, 0.1]; // Margins within the axes bounds
-    axMag.constraints = cAxMag; // Apply gridbag constraints
-    axMag.visible = "on";
-    axMag.y_label.text = "Magnitude [dB]";
-    axMag.x_label.text = "Frequency [Hz]"; // Initially hidden by lower plot
-    axMag.grid = [color("lightGray") color("lightGray")]; // Set grid color
-    disp("Created Magnitude axes with handle: ");
-    disp(axMag);
-    app.handles.axMag = axMag; // Store handle with explicit structure assignment
+    cAxPhase = createConstraints("gridbag", [1, 2, 1, 1], [1, 1], "both");
+    ghAxPhase = newaxes(hFreqFrame); // Assign to global ghAxPhase
+    ghAxPhase.tag = "bode_phase_axes";
+    ghAxPhase.constraints = cAxPhase;
+    ghAxPhase.axes_bounds = [0.1, 0.1, 0.85, 0.8];
+    ghAxPhase.margins = [0.12, 0.1, 0.1, 0.1];
+    ghAxPhase.visible = "on";
+    ghAxPhase.y_label.text = "Phase [deg]";
+    ghAxPhase.x_label.text = "Frequency [Hz]";
+    ghAxPhase.grid = [color("lightGray") color("lightGray")];
+     ghAxPhase.auto_clear = "off";
+    disp("Created Phase axes (global ghAxPhase).");
 
-    cAxPhase = createConstraints("gridbag", [1, 2, 1, 1], [1, 1], "both"); // Fill cell 1,2
-    axPhase = newaxes(hFreqFrame);
-    axPhase.tag = "bode_phase_axes"; // Add tag for easier finding
-    axPhase.axes_bounds = [0.1, 0.1, 0.85, 0.85];
-    axPhase.margins = [0.1, 0.1, 0.1, 0.1];
-    axPhase.constraints = cAxPhase;
-    axPhase.visible = "on";
-    axPhase.y_label.text = "Phase [deg]";
-    axPhase.x_label.text = "Frequency [Hz]";
-    axPhase.grid = [color("lightGray") color("lightGray")];
-    disp("Created Phase axes with handle: ");
-    disp(axPhase);
-    app.handles.axPhase = axPhase; // Store handle
+    cAxTime = createConstraints("gridbag", [1, 1, 1, 1], [1, 1], "both");
+    ghAxTime = newaxes(hTimeFrame); // Assign to global ghAxTime
+    ghAxTime.tag = "time_response_axes";
+    ghAxTime.constraints = cAxTime;
+    ghAxTime.axes_bounds = [0.1, 0.1, 0.85, 0.8];
+    ghAxTime.margins = [0.12, 0.1, 0.1, 0.1];
+    ghAxTime.visible = "on";
+    ghAxTime.y_label.text = "Output";
+    ghAxTime.x_label.text = "Time [s]";
+    ghAxTime.grid = [color("lightGray") color("lightGray")];
+     ghAxTime.auto_clear = "off";
+    disp("Created Time axes (global ghAxTime).");
 
-    // Inside Time Panel
-    cAxTime = createConstraints("gridbag", [1, 1, 1, 1], [1, 1], "both"); // Fill cell 1,1
-    axTime = newaxes(hTimeFrame);
-    axTime.tag = "time_response_axes"; // Add tag for easier finding
-    axTime.axes_bounds = [0.1, 0.1, 0.85, 0.85];
-    axTime.margins = [0.1, 0.1, 0.1, 0.1];
-    axTime.constraints = cAxTime;
-    axTime.visible = "on";
-    axTime.y_label.text = "Output";
-    axTime.x_label.text = "Time [s]";
-    axTime.grid = [color("lightGray") color("lightGray")];
-    disp("Created Time axes with handle: ");
-    disp(axTime);
-    app.handles.axTime = axTime; // Store handle
+    // --- Populate Panels with Controls ---
+    createPlantPanelControls(hPlantFrame); // Pass local handle to parent frame
+    // Call other panel population functions (still placeholders)
+    createControllerPanelControls(hCtrlFrame);
+    createPerformancePanelControls(hPerfFrame);
+    // createFrequencyResponsePanelControls(hFreqFrame);
+    // createTimeResponsePanelControls(hTimeFrame);
 
-    // Debug the app.handles structure after adding axes
-    disp("app.handles after adding axes:");
-    fieldnames = fieldnames(app.handles);
-    disp(fieldnames);
 
-    // --- Populate Panels with Controls (Example for Plant Panel) ---
-    // This part will involve calling functions like createPlantPanel defined below
-    // or directly placing controls here. Let's add the example popup now.
-    createPlantPanelControls(app.handles.plantFrame); // Call function to add controls
-
-    // --- Make the main figure visible ---
+    // --- Make the main figure visible LAST ---
     fig.visible = 'on';
-    disp("SciLoopShaper GUI created.");
+    disp("SciLoopShaper GUI created and visible.");
+
 endfunction
 
-// --- Placeholder/Implementation functions for populating panels ---
-// These will be filled in detail later or moved to separate files
 
+// --- Implementation function for populating Plant panel ---
 function createPlantPanelControls(parentHandle)
     // Adds controls to the Plant panel frame
     disp("Populating Plant Panel..."); // Debug
 
-    // Define grid constraints for controls within this panel
-    cLabelEx = createConstraints("gridbag", [1, 1, 1, 1], [0, 0], "none", "right", [2 2]);
-    cPopupEx = createConstraints("gridbag", [2, 1, 1, 1], [1, 0], "horizontal", "left", [2 2]);
-    cBtnWs   = createConstraints("gridbag", [1, 2, 1, 1], [0, 0], "horizontal", "center", [2 2]);
-    cBtnFile = createConstraints("gridbag", [2, 2, 1, 1], [0, 0], "horizontal", "center", [2 2]);
+    // Define grid constraints specific to this panel's gridbag layout
+    // createConstraints("gridbag", grid, weight, fill, anchor, padding)
 
-    cLabelMin = createConstraints("gridbag", [1, 3, 1, 1], [0, 0], "none", "right", [2 2]);
-    cEditMin  = createConstraints("gridbag", [2, 3, 1, 1], [1, 0], "horizontal", "left", [2 2]);
-    cLabelMax = createConstraints("gridbag", [1, 4, 1, 1], [0, 0], "none", "right", [2 2]);
-    cEditMax  = createConstraints("gridbag", [2, 4, 1, 1], [1, 0], "horizontal", "left", [2 2]);
-    cLabelPts = createConstraints("gridbag", [1, 5, 1, 1], [0, 0], "none", "right", [2 2]);
-    cEditPts  = createConstraints("gridbag", [2, 5, 1, 1], [1, 0], "horizontal", "left", [2 2]);
+    // Row 1: Example Label + Popup
+    cLabelEx = createConstraints("gridbag", [1, 1, 1, 1], [0, 0], "none", "right", [0 0]);
+    cPopupEx = createConstraints("gridbag", [2, 1, 1, 1], [1, 0], "horizontal", "left", [0 0]);
 
-    global app; // Access global app structure for defaults
+    // Row 2: Buttons
+    cBtnWs   = createConstraints("gridbag", [1, 2, 1, 1], [0.5, 0], "horizontal", "left", [0 0]);
+    cBtnFile = createConstraints("gridbag", [2, 2, 1, 1], [0.5, 0], "horizontal", "left", [0 0]);
 
-    // Example Plant Selection
+    // Row 3: Freq Min
+    cLabelMin = createConstraints("gridbag", [1, 3, 1, 1], [0, 0], "none", "right", [0 0]);
+    cEditMin  = createConstraints("gridbag", [2, 3, 1, 1], [1, 0], "horizontal", "left", [0 0]);
+
+    // Row 4: Freq Max
+    cLabelMax = createConstraints("gridbag", [1, 4, 1, 1], [0, 0], "none", "right", [0 0]);
+    cEditMax  = createConstraints("gridbag", [2, 4, 1, 1], [1, 0], "horizontal", "left", [0 0]);
+
+    // Row 5: Points
+    cLabelPts = createConstraints("gridbag", [1, 5, 1, 1], [0, 0], "none", "right", [0 0]);
+    cEditPts  = createConstraints("gridbag", [2, 5, 1, 1], [1, 0], "horizontal", "left", [0 0]);
+
+    global app; // Access global app structure for default freq values
+
+    // Create uicontrols using these constraints...
     uicontrol(parentHandle, 'style', 'text', 'string', 'Example:', 'constraints', cLabelEx, 'horizontalalignment', 'right');
-    hPlantEx = uicontrol(parentHandle, 'style', 'popupmenu', ...
+    uicontrol(parentHandle, 'style', 'popupmenu', ...
                          'string', '-- examples --|mass|2 mass collocated|2 mass non-collocated', ...
                          'Tag', 'plantExamplesPopup', ...
-                         'callback', 'handle_plant_selection()', ... // Connect to callback
+                         'callback', 'handle_plant_selection()', ...
                          'constraints', cPopupEx);
-    app.handles.plantPopup = hPlantEx; // Store handle if needed later
-
-    // Workspace/File Buttons
-    hPlantWs = uicontrol(parentHandle, 'style', 'pushbutton', 'string', 'From Workspace', 'Tag', 'plantWsButton', 'constraints', cBtnWs, 'callback', 'handle_load_plant_ws()');
-    hPlantFile = uicontrol(parentHandle, 'style', 'pushbutton', 'string', 'From File', 'Tag', 'plantFileButton', 'constraints', cBtnFile);
-    app.handles.plantWsBtn = hPlantWs;
-    app.handles.plantFileBtn = hPlantFile;
-
-    // Frequency Range Inputs
+    uicontrol(parentHandle, 'style', 'pushbutton', 'string', 'From Workspace', 'Tag', 'plantWsButton', 'constraints', cBtnWs, 'callback', 'handle_load_plant_ws()');
+    uicontrol(parentHandle, 'style', 'pushbutton', 'string', 'From File', 'Tag', 'plantFileButton', 'constraints', cBtnFile);
     uicontrol(parentHandle, 'style', 'text', 'string', 'Freq Min [Hz]:', 'constraints', cLabelMin, 'horizontalalignment', 'right');
-    hFmin = uicontrol(parentHandle, 'style', 'edit', 'string', string(app.freq.min), 'Tag', 'freqMinEdit', 'constraints', cEditMin, 'callback', 'handle_freq_change()');
-    app.handles.freqMinEdit = hFmin;
-
+    uicontrol(parentHandle, 'style', 'edit', 'string', string(app.freq.min), 'Tag', 'freqMinEdit', 'constraints', cEditMin, 'callback', 'handle_freq_change()');
     uicontrol(parentHandle, 'style', 'text', 'string', 'Freq Max [Hz]:', 'constraints', cLabelMax, 'horizontalalignment', 'right');
-    hFmax = uicontrol(parentHandle, 'style', 'edit', 'string', string(app.freq.max), 'Tag', 'freqMaxEdit', 'constraints', cEditMax, 'callback', 'handle_freq_change()');
-     app.handles.freqMaxEdit = hFmax;
-
+    uicontrol(parentHandle, 'style', 'edit', 'string', string(app.freq.max), 'Tag', 'freqMaxEdit', 'constraints', cEditMax, 'callback', 'handle_freq_change()');
     uicontrol(parentHandle, 'style', 'text', 'string', 'Points:', 'constraints', cLabelPts, 'horizontalalignment', 'right');
-    hFpts = uicontrol(parentHandle, 'style', 'edit', 'string', string(app.freq.points), 'Tag', 'freqPointsEdit', 'constraints', cEditPts, 'callback', 'handle_freq_change()');
-     app.handles.freqPointsEdit = hFpts;
+    uicontrol(parentHandle, 'style', 'edit', 'string', string(app.freq.points), 'Tag', 'freqPointsEdit', 'constraints', cEditPts, 'callback', 'handle_freq_change()');
+
 endfunction
 
+
+// --- Placeholder functions for populating other panels ---
 function createControllerPanelControls(parentHandle)
-    // Placeholder: Add controls for controller section
     disp("Populating Controller Panel... (TBD)");
-     uicontrol(parentHandle, 'style','text', 'string','Controller Controls Placeholder');
+     uicontrol(parentHandle, 'style','text', 'string','Controller Controls Placeholder', 'constraints', createConstraints("gridbag", [1,1,1,1],[1,1],"both"));
 endfunction
 
 function createPerformancePanelControls(parentHandle)
-    // Placeholder: Add controls/text for performance section
     disp("Populating Performance Panel... (TBD)");
-     uicontrol(parentHandle, 'style','text', 'string','Performance Display Placeholder');
+     uicontrol(parentHandle, 'style','text', 'string','Performance Display Placeholder', 'constraints', createConstraints("gridbag", [1,1,1,1],[1,1],"both"));
 endfunction
-
-function createFrequencyResponsePanelControls(parentHandle)
-    // Placeholder: Add radio buttons etc. for FRF selection
-     disp("Populating FRF Panel... (TBD)");
-     uicontrol(parentHandle, 'style','text', 'string','FRF Selection Placeholder');
-endfunction
-
-function createTimeResponsePanelControls(parentHandle)
-    // Placeholder: Add radio buttons etc. for Time Resp selection
-     disp("Populating Time Panel... (TBD)");
-     uicontrol(parentHandle, 'style','text', 'string','Time Response Selection Placeholder');
-endfunction
+// No controls needed yet for Freq/Time panels, only axes
+// function createFrequencyResponsePanelControls(parentHandle) ... endfunction
+// function createTimeResponsePanelControls(parentHandle) ... endfunction

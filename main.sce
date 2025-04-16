@@ -1,114 +1,69 @@
-// SciLoopShaper - A SISO Loop-Shaping Tool for Scilab
-// Released under GPL - see LICENSE file for details
+// File: main.sce (SIMPLIFIED DEBUG VERSION)
 
-// Execute files containing function definitions to load them
+clear; // Start fresh
+mode(0); // Verbose mode
 
-disp("Loading SciLoopShaper functions...");
+disp("SIMPLIFIED main.sce: Starting execution...");
 
 currentPath = get_absolute_file_path('main.sce');
-errored = %F; // Flag to track errors
+errored = %F;
 
-// List of function definition files relative to src/
-// Ensure all function files are listed here as they are created
-func_files = [
-    "core/analysis.sce";
-    "core/controller.sce";
-    "core/plant.sce";
-    "gui/callbacks.sce";      // Will be created next
-    "gui/main_gui.sce";       // This file itself
-    "plots/bode_plots.sce"    // Bode plotting function
-    // Add other files from src/io, src/utils, other plot types etc. as they are created
+// --- Define files to load MANUALLY and in ORDER ---
+// List core dependencies first, then GUI elements that depend on them
+files_to_load = [
+    // Core functions (assuming no inter-dependencies between these for now)
+    fullfile(currentPath, 'src', 'core', 'plant.sce');
+    fullfile(currentPath, 'src', 'core', 'controller.sce');
+    fullfile(currentPath, 'src', 'core', 'analysis.sce');
+
+    // Plotting functions (might depend on core)
+    fullfile(currentPath, 'src', 'plots', 'bode_plots.sce');
+
+    // GUI Callbacks (might depend on core/plotting)
+    fullfile(currentPath, 'src', 'gui', 'callbacks.sce');
+
+    // Main GUI definition (depends on callbacks being defined if assigned directly)
+    fullfile(currentPath, 'src', 'gui', 'main_gui.sce')
 ];
+disp("Files to load:"); disp(files_to_load);
+// ------------------------------------------------
 
-// --- Dynamically add subdirectories to the list of files to exec ---
-// This is more robust if files are added/removed
-subdirs_to_scan = ["core", "gui", "io", "plotting", "utils", "xcos_interface"];
-func_files_dynamic = [];
-for subdir = subdirs_to_scan
-    dir_path = fullfile(currentPath, 'src', subdir);
-    if isdir(dir_path) then
-        // Find all .sce and .sci files in the subdirectory
-        sce_files = listfiles(fullfile(dir_path, '*.sce'));
-        sci_files = listfiles(fullfile(dir_path, '*.sci'));
-        // Add relative paths to the list
-        for f = sce_files', func_files_dynamic = [func_files_dynamic; fullfile(subdir, f)]; end
-        for f = sci_files', func_files_dynamic = [func_files_dynamic; fullfile(subdir, f)]; end
-    end
-end
-// Remove duplicates if any file was listed manually and found dynamically
-func_files = unique(func_files_dynamic);
-disp("Found function files to load:"); disp(func_files);
-// --- End dynamic loading ---
+for i = 1:size(files_to_load, "*") // Use size with "*" for robustness
+    file_path = files_to_load(i);
+    disp(" "); // Blank line
+    disp("--> Attempting to exec: " + file_path);
 
-
-for i = 1:size(func_files, 1)
-    // Construct full path relative to main.sce location
-    file_path = fullfile(currentPath, 'src', func_files(i));
     if isfile(file_path) then
         try
-            exec(file_path, 0); // Execute silently (-1) or verbosely (0)
-            disp("--- Successfully executed: " + func_files(i)); // Add explicit success message
+            exec(file_path, 0); // Verbose execution
+            disp("--- Successfully executed: " + file_path);
         catch
             disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            disp("Error executing file: " + file_path);
+            disp("ERROR executing file: " + file_path);
             disp(lasterror());
-            disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             errored = %T;
-            break; // Stop if one file fails
+            disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            break; // Stop on first error
         end
     else
-        // Allow skipping non-existent files if planned directories are empty
-        // disp("Function file not found (skipping): " + file_path);
-        // errored = %T;
-        // break; // Stop if file is missing
+        disp("!!! WARNING: File not found, skipping: " + file_path);
+        // Decide if missing file is critical
+        // errored = %T; break;
     end
 end
 
-// In main.sce, modify the section after loading files:
-
+// --- Final Check ---
+disp(" ");
 if errored then
-    error("SciLoopShaper failed to load necessary function files.");
+    error("Simplified main.sce failed due to errors during exec.");
 else
-    disp("SciLoopShaper functions loaded successfully.");
-
-    // Force a global redefinition of core functions, callbacks, and main_gui
-    plant_path = fullfile(currentPath, 'src', 'core', 'plant.sce');
-    controller_path = fullfile(currentPath, 'src', 'core', 'controller.sce');
-    analysis_path = fullfile(currentPath, 'src', 'core', 'analysis.sce');
-    bode_plots_path = fullfile(currentPath, 'src', 'plots', 'bode_plots.sce');
-    callbacks_path = fullfile(currentPath, 'src', 'gui', 'callbacks.sce');
-    main_gui_path = fullfile(currentPath, 'src', 'gui', 'main_gui.sce');
-
-    // Load core functions first
-    core_files = [plant_path, controller_path, analysis_path, bode_plots_path];
-    for i = 1:size(core_files, 1)
-        if isfile(core_files(i)) then
-            disp("Reloading core file: " + core_files(i));
-            exec(core_files(i), 0);
-        else
-            disp("Warning: Could not find core file: " + core_files(i));
-        end
-    end
-
-    // Then load callbacks and main_gui
-    if isfile(callbacks_path) then
-        disp("Reloading callback functions to ensure global scope...");
-        exec(callbacks_path, 0);
+    disp("Simplified main.sce finished execution.");
+    // Check IMMEDIATELY if main_gui exists NOW
+    if exists('main_gui') == 1 then
+        disp(">>> SUCCESS: ''main_gui'' function IS DEFINED after loading.");
+        disp(">>> You should be able to call main_gui() manually.");
     else
-        disp("Warning: Could not find callbacks.sce file.");
-    end
-
-    if isfile(main_gui_path) then
-        disp("Reloading main_gui function to ensure global scope...");
-        exec(main_gui_path, 0);
-
-        if exists('main_gui') then
-            disp("Found main_gui function, launching GUI...");
-            main_gui();
-        else
-            disp("Warning: Could not find main_gui function after reload.");
-        end
-    else
-        disp("Warning: Could not find main_gui.sce file.");
+        disp(">>> FAILURE: ''main_gui'' function IS UNDEFINED after loading!");
+        disp(">>> Problem likely within the exec process or one of the loaded files.");
     end
 end
