@@ -163,18 +163,93 @@ function update_plots()
     disp("Callback: update_plots triggered."); // Debug
     global app;
 
+    // Debug app.handles structure
+    disp("Debugging app.handles structure:");
+    try
+        if ~isdef('app.handles', 'l') then
+            disp("app.handles is not defined");
+        else
+            disp("app.handles fields:");
+            fieldnames = fieldnames(app.handles);
+            disp(fieldnames);
+
+            if isfield(app.handles, 'axMag') then
+                disp("axMag is present in app.handles");
+                axMag_info = app.handles.axMag;
+                disp("axMag type: " + typeof(axMag_info));
+            else
+                disp("axMag is NOT present in app.handles");
+            end
+
+            if isfield(app.handles, 'axPhase') then
+                disp("axPhase is present in app.handles");
+                axPhase_info = app.handles.axPhase;
+                disp("axPhase type: " + typeof(axPhase_info));
+            else
+                disp("axPhase is NOT present in app.handles");
+            end
+        end
+    catch
+        disp("Error inspecting app.handles: " + lasterror());
+    end
+
     // --- Get Handles ---
-    // Check if handles exist and are valid before using them
+    // Try different approaches to get the axes handles
     axM = []; axP = []; axT = [];
-    if isdef('app.handles.axMag','l') then axM = app.handles.axMag; end
-    if isdef('app.handles.axPhase','l') then axP = app.handles.axPhase; end
-    if isdef('app.handles.axTime','l') then axT = app.handles.axTime; end
+
+    // Approach 1: Direct from app.handles
+    try
+        if isfield(app.handles, 'axMag') then
+            axM = app.handles.axMag;
+            disp("Got axMag handle from app.handles - type: " + typeof(axM));
+        end
+        if isfield(app.handles, 'axPhase') then
+            axP = app.handles.axPhase;
+            disp("Got axPhase handle from app.handles - type: " + typeof(axP));
+        end
+        if isfield(app.handles, 'axTime') then
+            axT = app.handles.axTime;
+            disp("Got axTime handle from app.handles - type: " + typeof(axT));
+        end
+    catch
+        disp("Error accessing handles from app.handles: " + lasterror());
+    end
+
+    // Approach 2: Find by tag if approach 1 failed
+    if isempty(axM) then
+        try
+            axM = findobj('tag', 'bode_mag_axes');
+            if ~isempty(axM) then
+                disp("Found axMag by tag");
+            end
+        catch
+            disp("Error finding axMag by tag: " + lasterror());
+        end
+    end
+
+    if isempty(axP) then
+        try
+            axP = findobj('tag', 'bode_phase_axes');
+            if ~isempty(axP) then
+                disp("Found axPhase by tag");
+            end
+        catch
+            disp("Error finding axPhase by tag: " + lasterror());
+        end
+    end
 
     // --- Update Frequency Domain Plot (Bode for now) ---
     if ~isempty(axM) & ~isempty(axP) then // Check if axes handles are valid
+        disp("Both axes handles found, attempting to plot...");
+
         // Clear previous plots on these specific axes
-        cla(axM);
-        cla(axP);
+        try
+            cla(axM);
+            cla(axP);
+            disp("Successfully cleared axes");
+        catch
+            disp("Error clearing axes: " + lasterror());
+        end
 
         // Check if a valid plant exists
         if isdef('app.plant','l') & ~isempty(app.plant) & typeof(app.plant) == "rational" then
@@ -182,6 +257,7 @@ function update_plots()
             try
                 // Call the modified plot_bode function, passing axes handles
                 plot_bode(app.plant, app.freq.min, app.freq.max, app.freq.points, '-', 'b', axM, axP);
+                disp("plot_bode called successfully");
 
                 // Try setting grid again AFTER plotting
                 axM.grid = [color("lightGray") color("lightGray")];
@@ -212,14 +288,19 @@ function update_plots()
     end
 
     // --- Update Time Domain Plot (Placeholder for now) ---
-     if ~isempty(axT) then // Check if axes handle is valid
-         cla(axT); // Clear previous plot
-         disp("Time plot cleared (implementation TBD).");
-         xtitle(axT, "Time Response (TBD)");
-         axT.grid = [color("lightGray") color("lightGray")];
-     else
-        disp("Warning: Time axis handle not found or invalid.");
-     end
+    if ~isempty(axT) then // Check if axes handle is valid
+        disp("Time axis handle found");
+        try
+            cla(axT); // Clear previous plot
+            disp("Time plot cleared (implementation TBD).");
+            xtitle(axT, "Time Response (TBD)");
+            axT.grid = [color("lightGray") color("lightGray")];
+        catch
+            disp("Error updating time plot: " + lasterror());
+        end
+    else
+       disp("Warning: Time axis handle not found or invalid.");
+    end
 endfunction
 
 function handle_load_plant_ws()
