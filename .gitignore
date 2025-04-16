@@ -103,3 +103,6 @@ nbproject/
 *~
 .fuse_hidden*
 .directory
+
+# other
+repomix-output.xml
