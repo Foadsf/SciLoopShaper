@@ -1,129 +1,76 @@
-function plot_bode(sys, w_min, w_max, n_points, line_style, line_color, axMagHandle, axPhaseHandle)
-    // Plot Bode diagram for the given system
-    // Can optionally plot onto existing axes provided by axMagHandle and axPhaseHandle
+// File: src/plots/bode_plots.sce
 
-    disp("plot_bode called with axes handles:");
-    disp("axMagHandle type: " + typeof(axMagHandle));
-    disp("axPhaseHandle type: " + typeof(axPhaseHandle));
+function plot_bode(sys, w_min, w_max, n_points, line_style_str, line_color_str, axMagHandle, axPhaseHandle)
+    // Plot Bode diagram using semilogx for clarity
 
-    is_gui_mode = %F; // Flag to track if plotting to GUI axes
-    if exists('axMagHandle','local') & exists('axPhaseHandle','local') then
-        // Check if the provided arguments are valid handles
-        if ~isempty(axMagHandle) & ~isempty(axPhaseHandle) then
-            is_gui_mode = %T;
-            disp("plot_bode: Plotting in GUI mode."); // Debug
-        else
-            disp("plot_bode: One or both axes handles are empty.");
+    scilab_style_code = line_style_str; // e.g., 'b-'
+
+    is_gui_mode = %F;
+    if isdef('axMagHandle','local') & isdef('axPhaseHandle','local') then
+        if typeof(axMagHandle) == "handle" & typeof(axPhaseHandle) == "handle" then
+             if axMagHandle.type == "Axes" & axPhaseHandle.type == "Axes" then
+                 is_gui_mode = %T;
+             end
         end
-    else
-        disp("plot_bode: Missing axes handle arguments.");
     end
 
-    // Calculate frequency response
     [mag, phase_deg, w_hz] = calculate_frequency_response(sys, w_min, w_max, n_points);
 
-    // Check if calculation returned valid data
     if isempty(mag) | isempty(phase_deg) | isempty(w_hz) then
         warning("calculate_frequency_response returned empty data. Cannot plot Bode.");
-        // If in GUI mode, maybe display a message on the axes?
-        if is_gui_mode then
-            try
-                xtitle(axMagHandle, "Frequency Response Calculation Failed");
-                xtitle(axPhaseHandle, "");
-            catch
-                disp("Error setting title on axes: " + lasterror());
-            end
-        end
+        if is_gui_mode then /* Display error on axes */ end
         return;
     end
 
-    // Convert magnitude to dB
-    epsilon = 1e-200; // Avoid log10(0)
+    epsilon = 1e-200;
     mag_db = 20*log10(mag + epsilon);
 
     // --- Plot Magnitude ---
-    if is_gui_mode then
-        try
-            disp("Setting current axes to axMagHandle...");
-            sca(axMagHandle); // Set current axes to the provided handle
-            disp("Successfully set current axes");
-        catch
-            disp("Error setting current axes to axMagHandle: " + lasterror());
-            is_gui_mode = %F; // Fall back to standard plotting
-        end
-    else
-        disp("Creating new subplot for magnitude");
-        subplot(2, 1, 1); // Create subplot in a new figure
-    end
-
+    if is_gui_mode then sca(axMagHandle); else subplot(2, 1, 1); end
     try
-        disp("Plotting magnitude data...");
-        plot2d(w_hz, mag_db, style=color(line_color), logflag="ln"); // Use plot2d with logflag="ln" for semilogx
-        disp("Successfully plotted magnitude data");
+        // Fix: Use semilogx directly with style string
+        semilogx(w_hz, mag_db, scilab_style_code);
+        // disp("Successfully plotted magnitude data using semilogx"); // Optional Debug
     catch
-        disp("Error plotting magnitude data: " + lasterror());
+        disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        disp("Error plotting magnitude data with semilogx:");
+        disp(lasterror());
+        disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     end
-
-    // Set labels and title using handle properties if in GUI mode
-    if is_gui_mode then
-        try
-            axMagHandle.x_label.text = ""; // X label only on bottom plot
-            axMagHandle.y_label.text = "Magnitude [dB]";
-            axMagHandle.title.text = "Bode Plot"; // Title on top plot only
-            // axMagHandle.grid = [color("light gray") color("light gray")]; // Set grid from update_plots
-            disp("Successfully set magnitude axes properties");
-        catch
-            disp("Error setting magnitude axes properties: " + lasterror());
-        end
-    else
-        xlabel("Frequency [Hz]"); // Global labels for standalone figure
+    if is_gui_mode then // Set properties on handle
+        axMagHandle.x_label.visible = "off";
+        axMagHandle.y_label.text = "Magnitude [dB]";
+        axMagHandle.title.text = "Bode Plot";
+    else // Use global functions for standalone figure
         ylabel("Magnitude [dB]");
         title("Bode Plot - Magnitude");
-        xgrid(); // Use basic grid for standalone figure
-    end
-
-    // --- Plot Phase ---
-    if is_gui_mode then
-        try
-            disp("Setting current axes to axPhaseHandle...");
-            sca(axPhaseHandle); // Set current axes
-            disp("Successfully set current axes to phase");
-        catch
-            disp("Error setting current axes to axPhaseHandle: " + lasterror());
-            is_gui_mode = %F; // Fall back to standard plotting
-        end
-    else
-        disp("Creating new subplot for phase");
-        subplot(2, 1, 2);
-    end
-
-    try
-        disp("Plotting phase data...");
-        plot2d(w_hz, phase_deg, style=color(line_color), logflag="ln");
-        disp("Successfully plotted phase data");
-    catch
-        disp("Error plotting phase data: " + lasterror());
-    end
-
-    if is_gui_mode then
-        try
-            axPhaseHandle.x_label.text = "Frequency [Hz]";
-            axPhaseHandle.y_label.text = "Phase [deg]";
-            axPhaseHandle.title.text = ""; // No title on phase plot
-            // axPhaseHandle.grid = [color("light gray") color("light gray")]; // Set grid from update_plots
-            disp("Successfully set phase axes properties");
-        catch
-            disp("Error setting phase axes properties: " + lasterror());
-        end
-    else
-        xlabel("Frequency [Hz]");
-        ylabel("Phase [deg]");
-        title("Bode Plot - Phase");
         xgrid();
     end
 
-    disp("plot_bode completed successfully");
-endfunction
+    // --- Plot Phase ---
+    if is_gui_mode then sca(axPhaseHandle); else subplot(2, 1, 2); end
+    try
+        // Fix: Use semilogx directly with style string
+        semilogx(w_hz, phase_deg, scilab_style_code);
+        // disp("Successfully plotted phase data using semilogx"); // Optional Debug
+    catch
+        disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        disp("Error plotting phase data with semilogx:");
+        disp(lasterror());
+        disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    end
+     if is_gui_mode then // Set properties on handle
+        axPhaseHandle.x_label.text = "Frequency [Hz]";
+        axPhaseHandle.y_label.text = "Phase [deg]";
+        axPhaseHandle.title.text = "";
+    else // Use global functions for standalone figure
+        xlabel("Frequency [Hz]");
+        ylabel("Phase [deg]");
+        xgrid();
+    end
+
+endfunction // End of plot_bode function
+
 
 // --- Keep plot_nyquist and plot_nichols as they were for now ---
 // They will need similar modifications later to accept axes handles

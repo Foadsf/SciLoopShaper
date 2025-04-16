@@ -169,82 +169,121 @@ function handle_freq_change()
 
 endfunction
 
+
 function update_plots()
     // Main function to update all plot areas based on current app state
     global app; // Need app for state
     global ghAxMag ghAxPhase ghAxTime; // Access handles directly
     disp("Callback: update_plots triggered.");
 
+    // --- Get Handles ---
+    axM = []; axP = []; axT = [];
+    // Check if globals exist and retrieve handles
+    if isdef('ghAxMag') then axM = ghAxMag; end
+    if isdef('ghAxPhase') then axP = ghAxPhase; end
+    if isdef('ghAxTime') then axT = ghAxTime; end
+
     // --- Update Frequency Domain Plot (Bode for now) ---
-    // Fix: Use typeof() == "handle" instead of ishandle()
-    if isdef('ghAxMag') & typeof(ghAxMag) == "handle" & isdef('ghAxPhase') & typeof(ghAxPhase) == "handle" then
+    // Check if axes handles seem valid using typeof
+    if typeof(axM) == "handle" & typeof(axP) == "handle" then
         disp("Mag/Phase global axes handles seem valid (type check), attempting to update...");
         try
             // Clear previous plots using delete(children)
-            // Add check if children exist before deleting
-            if ~isempty(ghAxMag.children) then delete(ghAxMag.children); end
-            if ~isempty(ghAxPhase.children) then delete(ghAxPhase.children); end
+            if ~isempty(axM.children) then delete(axM.children); end
+            if ~isempty(axP.children) then delete(axP.children); end
             disp("Successfully cleared freq axes content (if any).");
+
+            // --- DEBUG: Simple plot test ---
+            disp("Attempting simple plot on ghAxMag...");
+            plot(ghAxMag, 1:10, (1:10).^2); // Simple parabola
+            ghAxMag.title.text = "Simple Test Plot"; // Set title for test plot
+            drawnow(); // Force redraw to see test plot
+            disp("Simple plot attempted. Check GUI.");
+            messagebox("Check if simple plot appeared on Magnitude Axes", "Debug Pause"); // Pause execution
+            // --- End Debug Test ---
+
         catch
-            disp("Warning: Error clearing freq axes children: " + lasterror());
+             disp("Warning: Error during axes clear or simple plot test: " + lasterror());
+             // Decide if we should proceed or return
+             // return;
         end
 
         // Check if a valid plant exists
         plant_exists_and_valid = %F; // Flag
         if isdef('app','l') & isfield(app,'plant') & ~isempty(app.plant) then
             disp("Type of app.plant: " + typeof(app.plant));
-             if typeof(app.plant) == "rational" | typeof(app.plant) == "state-space" then
+             if typeof(app.plant) == "rational" | typeof(app.plant) == "state-space" then // Allow SS too
                  plant_exists_and_valid = %T;
              end
         end
 
+        // --- Clear the test plot before real plot ---
+        try
+            if typeof(axM)=="handle" & ~isempty(axM.children) then delete(axM.children); end
+            if typeof(axP)=="handle" & ~isempty(axP.children) then delete(axP.children); end
+             disp("Cleared test plot / axes before Bode plot.");
+        catch
+            disp("Warning: Error clearing axes before Bode plot: " + lasterror());
+        end
+        // -------------------------------------------
+
+
         if plant_exists_and_valid then
             disp("Plotting Bode for current plant...");
-            try
+            try // Inner try for plot_bode call and subsequent actions
                  if ~exists('plot_bode') then error("Function plot_bode not loaded!"); end
-                 plot_bode(app.plant, app.freq.min, app.freq.max, app.freq.points, '-', 'b', ghAxMag, ghAxPhase);
-                 disp("plot_bode called successfully");
+                 // Pass global handles to plot_bode
+                 plot_bode(app.plant, app.freq.min, app.freq.max, app.freq.points, 'b-', '', axM, axP);
+                 disp("plot_bode call completed.");
 
-                 ghAxMag.grid = [color("lightGray") color("lightGray")];
-                 ghAxPhase.grid = [color("lightGray") color("lightGray")];
-                 xtitle(ghAxMag, "Plant Frequency Response");
+                 // Set grid AFTER plotting
+                 axM.grid = [color("lightGray") color("lightGray")];
+                 axP.grid = [color("lightGray") color("lightGray")];
 
-                 disp("Bode plot updated.");
-            catch
+                 // Use property access for title
+                 axM.title.text = "Plant Frequency Response";
+
+                 drawnow(); // Force redraw after plot_bode
+                 disp("Bode plot updated. Check GUI.");
+
+            catch // Catch errors from plot_bode OR the subsequent lines (like xtitle)
                 disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                disp("Error calling plot_bode:");
+                disp("Error DURING/AFTER plot_bode call:"); // Clarify where error happens
                 disp(lasterror());
-                // Fix: Use typeof check before xtitle/grid
-                if typeof(ghAxMag)=="handle" then xtitle(ghAxMag, "Error plotting Bode!"); end
-                if typeof(ghAxMag)=="handle" then ghAxMag.grid = [color("lightGray") color("lightGray")]; end
-                if typeof(ghAxPhase)=="handle" then ghAxPhase.grid = [color("lightGray") color("lightGray")]; end
+                // Try setting error title, but guard with typeof check
+                if typeof(axM)=="handle" then axM.title.text = "Error plotting Bode!"; drawnow(); end // Redraw after error title
+                if typeof(axM)=="handle" then axM.grid = [color("lightGray") color("lightGray")]; end
+                if typeof(axP)=="handle" then axP.grid = [color("lightGray") color("lightGray")]; end
                  disp("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             end
-        else
+        else // No valid plant
             disp("No valid plant loaded, clearing Bode plot.");
-             // Fix: Use typeof check before xtitle/grid
-            if typeof(ghAxMag)=="handle" then
-                xtitle(ghAxMag, "No Plant Loaded");
-                ghAxMag.grid = [color("lightGray") color("lightGray")];
+             // Guard title and grid calls using typeof check
+            if typeof(axM)=="handle" then
+                axM.title.text = "No Plant Loaded"; // Use property access
+                axM.grid = [color("lightGray") color("lightGray")];
+                drawnow(); // Redraw
             end
-            if typeof(ghAxPhase)=="handle" then
-                 xtitle(ghAxPhase, ""); // Clear potential old title
-                 ghAxPhase.grid = [color("lightGray") color("lightGray")];
+            if typeof(axP)=="handle" then
+                 axP.title.text = ""; // Clear title
+                 axP.grid = [color("lightGray") color("lightGray")];
             end
         end
     else
         disp("Warning: Global Magnitude/Phase axes handles not found or invalid (type check failed) in update_plots.");
     end
 
-    // --- Update Time Domain Plot (Placeholder for now) ---
-     // Fix: Use typeof() == "handle" instead of ishandle()
-     if isdef('ghAxTime') & typeof(ghAxTime) == "handle" then
+    // --- Update Time Domain Plot ---
+     // Use typeof() == "handle" check
+     if isdef('axT') & typeof(axT) == "handle" then
          disp("Time axis handle seems valid (type check), clearing.");
          try
-             if ~isempty(ghAxTime.children) then delete(ghAxTime.children); end // Check children before delete
+             if ~isempty(axT.children) then delete(axT.children); end // Check children before delete
              disp("Time plot cleared.");
-             xtitle(ghAxTime, "Time Response (TBD)");
-             ghAxTime.grid = [color("lightGray") color("lightGray")];
+             // Use property access for title
+             axT.title.text = "Time Response (TBD)";
+             axT.grid = [color("lightGray") color("lightGray")];
+             drawnow(); // Force redraw
          catch
              disp("Warning: Error updating time plot: " + lasterror());
          end
@@ -252,7 +291,7 @@ function update_plots()
         disp("Warning: Global Time axis handle not found or invalid (type check failed) in update_plots.");
      end
 
-endfunction
+endfunction // End of update_plots function
 
 
 function handle_load_plant_ws()
