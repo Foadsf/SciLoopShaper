@@ -64,6 +64,38 @@ function [block] = create_controller_block(blockType, params)
         // Fix: Ensure rational form is used (already was)
         local_tf = syslin('c', gain * num / den);
 
+    case "High pass 1st order" then
+        gain = params.gain;
+        zeros_val = params.zeros; // Zero frequency
+        poles_val = params.poles; // Pole frequency (should be higher than zero)
+        local_tf = syslin('c', gain * s / (s + poles_val));
+
+    case "High pass 2nd order" then
+        gain = params.gain;
+        wn = params.wn;     // Natural frequency
+        damp = params.damp; // Damping ratio
+        local_tf = syslin('c', gain * s^2 / (s^2 + 2*damp*wn*s + wn^2));
+
+    case "PI" then
+        kp = params.kp;  // Proportional gain
+        ki = params.ki;  // Integral gain
+        local_tf = syslin('c', (kp*s + ki) / s);
+
+    case "PID" then
+        kp = params.kp;  // Proportional gain
+        ki = params.ki;  // Integral gain
+        kd = params.kd;  // Derivative gain
+        local_tf = syslin('c', (kd*s^2 + kp*s + ki) / s);
+
+    case "Band pass" then
+        gain = params.gain;
+        wn_low = params.wn_low;   // Lower cutoff
+        wn_high = params.wn_high; // Upper cutoff
+        damp = params.damp;       // Damping for both poles
+        num = gain * wn_high * s;
+        den = (s^2 + 2*damp*wn_low*s + wn_low^2) * (s^2 + 2*damp*wn_high*s + wn_high^2);
+        local_tf = syslin('c', num / den);
+
     else
         error("Unknown controller block type: " + blockType);
     end

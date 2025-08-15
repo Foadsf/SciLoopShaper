@@ -15,6 +15,7 @@ files_to_load = [
     // Core functions
     fullfile(currentPath, 'src', 'core', 'plant.sce');
     fullfile(currentPath, 'src', 'core', 'controller.sce');
+    fullfile(currentPath, 'src', 'core', 'controller_validation.sce');
     fullfile(currentPath, 'src', 'core', 'analysis.sce');
     // Plotting functions
     fullfile(currentPath, 'src', 'plots', 'bode_plots.sce');
@@ -170,6 +171,47 @@ disp("  Running test: analyze frequency-response --plot-type bode");
 // cli_main(["analyze", "frequency-response", "--plot-type", "bode"]);
 // assert_true(%T, "analyze frequency-response with plot type should run without error");
 
+
+// --- Test Cases for Enhanced Core Features ---
+function test_enhanced_controller_blocks()
+    disp("=== Testing Enhanced Controller Blocks ===");
+
+    s = poly(0, 's');
+
+    // Test new controller blocks
+    test_blocks = [
+        "High pass 1st order";
+        "High pass 2nd order";
+        "PI";
+        "PID";
+        "Band pass"
+    ];
+
+    test_params = list();
+    test_params($+1) = struct('gain', 1, 'zeros', 1, 'poles', 10);  // High pass 1st
+    test_params($+1) = struct('gain', 1, 'wn', 10, 'damp', 0.7);    // High pass 2nd
+    test_params($+1) = struct('kp', 1, 'ki', 0.1);                 // PI
+    test_params($+1) = struct('kp', 1, 'ki', 0.1, 'kd', 0.01);     // PID
+    test_params($+1) = struct('gain', 1, 'wn_low', 1, 'wn_high', 10, 'damp', 0.7); // Band pass
+
+    for i = 1:size(test_blocks, "*")
+        try
+            block = create_controller_block(test_blocks(i), test_params(i));
+            disp("✓ " + test_blocks(i) + " created successfully");
+            // Basic validation
+            if typeof(block.tf) == "rational" then
+                disp("  ✓ Transfer function is valid");
+            else
+                disp("  ✗ Transfer function invalid");
+            end
+        catch
+            disp("✗ " + test_blocks(i) + " failed: " + lasterror());
+        end
+    end
+endfunction
+
+// Run the new tests
+test_enhanced_controller_blocks();
 
 disp(" ");
 disp("--- CLI Test Suite Finished ---");

@@ -16,6 +16,7 @@ files_to_load = [
     // Core functions
     fullfile(currentPath, 'src', 'core', 'plant.sce');
     fullfile(currentPath, 'src', 'core', 'controller.sce');
+    fullfile(currentPath, 'src', 'core', 'controller_validation.sce');
     fullfile(currentPath, 'src', 'core', 'analysis.sce');
 
     // Plotting functions
