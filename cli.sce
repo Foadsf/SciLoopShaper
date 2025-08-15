@@ -21,6 +21,9 @@ files_to_load = [
     // Plotting functions
     fullfile(currentPath, 'src', 'plots', 'bode_plots.sce');
 
+    // Utility functions
+    fullfile(currentPath, 'src', 'utils', 'utils.sce');
+
     // CLI functions (in order of dependency)
     fullfile(currentPath, 'src', 'cli', 'cli_parser.sce');
     fullfile(currentPath, 'src', 'cli', 'cli_help.sce');

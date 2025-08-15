@@ -18,6 +18,8 @@ files_to_load = [
     fullfile(currentPath, 'src', 'core', 'analysis.sce');
     // Plotting functions
     fullfile(currentPath, 'src', 'plots', 'bode_plots.sce');
+    // Utility functions
+    fullfile(currentPath, 'src', 'utils', 'utils.sce');
     // CLI functions
     fullfile(currentPath, 'src', 'cli', 'cli_parser.sce');
     fullfile(currentPath, 'src', 'cli', 'cli_help.sce');
@@ -141,6 +143,20 @@ catch
     should_error = %T;
 end
 assert_true(should_error, "Should error on invalid remove index");
+
+
+// --- Test Cases for Analyze ---
+disp(" ");
+disp("--> Testing analyze commands...");
+
+// Setup: Ensure we have a plant and a controller
+cli_main(["plant", "load-example", "mass"]);
+cli_main(["controller", "add", "Gain", "gain=10"]);
+
+// Test Case 11: Analyze stability
+disp("  Running test: analyze stability");
+cli_main(["analyze", "stability"]);
+assert_true(%T, "analyze stability should run without error");
 
 
 disp(" ");

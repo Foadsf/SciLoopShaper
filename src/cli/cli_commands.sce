@@ -14,8 +14,7 @@ function cli_execute_command(parsed_command)
     case "controller"
         cli_handle_controller_command(parsed_command);
     case "analyze"
-        // TODO: cli_handle_analysis_command(parsed_command);
-        disp("Analysis commands not implemented yet.");
+        cli_handle_analysis_command(parsed_command);
     // ... other commands
     else
         error("Unknown command: " + parsed_command.command);
@@ -161,5 +160,36 @@ function cli_handle_controller_command(parsed_command)
     //     // TODO: Implement logic to calculate the combined controller.
     else
         error("Unknown controller command: " + parsed_command.sub_command);
+    end
+endfunction
+
+
+function cli_handle_analysis_command(parsed_command)
+    // This function handles all sub-commands for the 'analyze' command.
+    global CLI_STATE;
+
+    select parsed_command.sub_command
+    case "stability"
+        handle_analyze_stability(parsed_command.args, parsed_command.command_options);
+    case "frequency-response"
+        disp("analyze frequency-response not implemented yet.");
+    case "time-response"
+        disp("analyze time-response not implemented yet.");
+    case "margins"
+        disp("analyze margins not implemented yet.");
+    else
+        error("Unknown analyze subcommand: " + parsed_command.sub_command);
+    end
+endfunction
+
+
+function handle_analyze_stability(args, options)
+    global CLI_STATE;
+    disp("--- handle_analyze_stability ---");
+
+    // Validate state
+    if isempty(CLI_STATE.plant) then
+        cli_error("No plant loaded. Use 'plant load-*' commands first.");
+        return;
     end
 endfunction
