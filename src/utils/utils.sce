@@ -24,3 +24,27 @@ function cli_info(message)
     // Placeholder for info message formatting
     disp("INFO: " + message);
 endfunction
+
+function [sys] = get_combined_system()
+    global CLI_STATE;
+
+    if isempty(CLI_STATE.controller) then
+        sys = CLI_STATE.plant;
+    else
+        // Combine all controller blocks first
+        controller_tf = CLI_STATE.controller(1).tf;
+        for i = 2:length(CLI_STATE.controller)
+            controller_tf = controller_tf * CLI_STATE.controller(i).tf;
+        end
+        sys = CLI_STATE.plant * controller_tf;
+    end
+endfunction
+
+function [flag] = get_option_flag(options, flag_name, default_value)
+    // Checks for the presence of a flag-like option.
+    if isfield(options, flag_name) then
+        flag = %T;
+    else
+        flag = default_value;
+    end
+endfunction

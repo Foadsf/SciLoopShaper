@@ -28,6 +28,7 @@ files_to_load = [
     fullfile(currentPath, 'src', 'cli', 'cli_parser.sce');
     fullfile(currentPath, 'src', 'cli', 'cli_help.sce');
     fullfile(currentPath, 'src', 'cli', 'cli_output.sce');
+    fullfile(currentPath, 'src', 'cli', 'cli_plot.sce');
     fullfile(currentPath, 'src', 'cli', 'cli_commands.sce');
     fullfile(currentPath, 'src', 'cli', 'cli_main.sce');
 ];

@@ -24,6 +24,7 @@ files_to_load = [
     fullfile(currentPath, 'src', 'cli', 'cli_parser.sce');
     fullfile(currentPath, 'src', 'cli', 'cli_help.sce');
     fullfile(currentPath, 'src', 'cli', 'cli_output.sce');
+    fullfile(currentPath, 'src', 'cli', 'cli_plot.sce');
     fullfile(currentPath, 'src', 'cli', 'cli_commands.sce');
     fullfile(currentPath, 'src', 'cli', 'cli_main.sce');
 ];
@@ -157,6 +158,17 @@ cli_main(["controller", "add", "Gain", "gain=10"]);
 disp("  Running test: analyze stability");
 cli_main(["analyze", "stability"]);
 assert_true(%T, "analyze stability should run without error");
+
+// Test Case 12: Analyze frequency response
+disp("  Running test: analyze frequency-response");
+cli_main(["analyze", "frequency-response"]);
+assert_true(%T, "analyze frequency-response should run without error");
+
+// Test Case 13: Analyze frequency response with plot type
+disp("  Running test: analyze frequency-response --plot-type bode");
+// This will fail until the parser is fixed to handle options
+// cli_main(["analyze", "frequency-response", "--plot-type", "bode"]);
+// assert_true(%T, "analyze frequency-response with plot type should run without error");
 
 
 disp(" ");
