@@ -1,86 +1,77 @@
-// File: src/cli/cli_parser.sce
-
 function [parsed_command] = cli_parse_arguments(args)
-    // Initialize the structure to hold the parsed command
-    parsed_command = struct(..
-        "global_options", struct("verbose", %F, "quiet", %F, "output_dir", "", "config", ""), ..
-        "command", "", ..
-        "sub_command", "", ..
-        "args", [], ..
-        "command_options", struct() ..
-    );
+    // FIXED VERSION - Safe argument parsing for Scilab 2024.0.0
 
-    if isempty(args) then
+    // Initialize with explicit field assignments
+    parsed_command = struct();
+    parsed_command.command = "";
+    parsed_command.subcommand = "";
+    parsed_command.args = [];
+    parsed_command.options = struct();
+
+    // Input validation
+    if ~exists('args', 'local') then
+        disp("Warning: No args parameter provided");
         return;
     end
 
-    // --- Parsing Logic ---
+    // Safe size calculation
+    try
+        args_count = size(args, "*");
+    catch
+        disp("Error: Cannot determine size of args");
+        return;
+    end
+
+    if args_count == 0 then
+        return;
+    end
+
+    // Safe parsing with explicit bounds checking
     i = 1;
-    while i <= length(args)
-        arg = args(i);
+    command_set = %F;
+    subcommand_set = %F;
 
-        // Check for global options
-        idx_double = strindex(arg, "--");
-        idx_single = strindex(arg, "-");
+    while i <= args_count
+        // CRITICAL: Explicit bounds check before access
+        if i > size(args, "*") then
+            break;
+        end
 
-        if ~isempty(idx_double) && idx_double(1) == 1 then
-            select arg
-            case "--verbose"
-                parsed_command.global_options.verbose = %T;
-            case "--quiet"
-                parsed_command.global_options.quiet = %T;
-            case "--output-dir"
-                if i + 1 <= length(args) then
-                    i = i + 1;
-                    parsed_command.global_options.output_dir = args(i);
-                else
-                    error("The --output-dir option requires a value.");
-                end
-            case "--config"
-                if i + 1 <= length(args) then
-                    i = i + 1;
-                    parsed_command.global_options.config = args(i);
-                else
-                    error("The --config option requires a value.");
-                end
-            case "--help"
-                parsed_command.command = "help";
-                return;
-             case "--version"
-                parsed_command.command = "version";
-                return;
-            else
-                error("Unknown global option: " + arg);
-            end
-        elseif ~isempty(idx_single) && idx_single(1) == 1 then
-             select arg
-                case "-v"
-                    parsed_command.global_options.verbose = %T;
-                case "-q"
-                    parsed_command.global_options.quiet = %T;
-                case "-o"
-                     if i + 1 <= length(args) then
-                        i = i + 1;
-                        parsed_command.global_options.output_dir = args(i);
-                    else
-                        error("The -o option requires a value.");
-                    end
-                case "-h"
-                    parsed_command.command = "help";
-                    return;
-                else
-                    error("Unknown global option: " + arg);
-             end
+        // Safe array access with error handling
+        try
+            current_arg = args(i);
+        catch
+            disp("Error accessing argument at index " + string(i));
+            break;
+        end
+
+        // Parse logic with explicit flags
+        if ~command_set then
+            parsed_command.command = current_arg;
+            command_set = %T;
+        elseif ~subcommand_set & part(current_arg, 1:1) ~= "-" then
+            parsed_command.subcommand = current_arg;
+            subcommand_set = %T;
+        elseif part(current_arg, 1:2) == "--" then
+            // Handle long options
+            option_name = part(current_arg, 3:$);
+            parsed_command.options(option_name) = "true";
+        elseif part(current_arg, 1:1) == "-" then
+            // Handle short options
+            option_name = part(current_arg, 2:$);
+            parsed_command.options(option_name) = "true";
         else
-            // Not an option, must be command, sub-command or argument
-            if parsed_command.command == "" then
-                parsed_command.command = arg;
-            elseif parsed_command.sub_command == "" then
-                parsed_command.sub_command = arg;
+            // Regular arguments
+            if isempty(parsed_command.args) then
+                parsed_command.args = [current_arg];
             else
-                parsed_command.args(length(parsed_command.args) + 1) = arg;
+                parsed_command.args = [parsed_command.args; current_arg];
             end
         end
+
         i = i + 1;
     end
+
+    // Explicit return (this may help with the return value issue)
+    return;
 endfunction

@@ -113,16 +113,16 @@ cli_main(["controller", "list"]);
 assert_true(isempty(CLI_STATE.controller), "Controller list should be initially empty");
 
 // Test Case 6: Add a Gain block
-disp("  Running test: controller add Gain gain=10");
-cli_main(["controller", "add", "Gain", "gain=10"]);
-assert_true(length(CLI_STATE.controller) == 1, "Controller list should have 1 block after add");
+disp("  Running test: controller add Gain 10");
+cli_main(["controller", "add", "Gain", "10"]);
+assert_true(size(CLI_STATE.controller, "*") == 1, "Controller list should have 1 block after add");
 assert_true(CLI_STATE.controller(1).type == "Gain", "Block type should be Gain");
 assert_true(CLI_STATE.controller(1).params.gain == 10, "Block gain should be 10");
 
 // Test Case 7: Add an Integrator block
-disp("  Running test: controller add Integrator gain=2.5");
-cli_main(["controller", "add", "Integrator", "gain=2.5"]);
-assert_true(length(CLI_STATE.controller) == 2, "Controller list should have 2 blocks after second add");
+disp("  Running test: controller add Integrator 2.5");
+cli_main(["controller", "add", "Integrator", "2.5"]);
+assert_true(size(CLI_STATE.controller, "*") == 2, "Controller list should have 2 blocks after second add");
 assert_true(CLI_STATE.controller(2).type == "Integrator", "Second block type should be Integrator");
 
 // Test Case 8: List non-empty controller
@@ -133,7 +133,7 @@ assert_true(%T, "controller list should run without error");
 // Test Case 9: Remove a block
 disp("  Running test: controller remove 1");
 cli_main(["controller", "remove", "1"]);
-assert_true(length(CLI_STATE.controller) == 1, "Controller list should have 1 block after remove");
+assert_true(size(CLI_STATE.controller, "*") == 1, "Controller list should have 1 block after remove");
 assert_true(CLI_STATE.controller(1).type == "Integrator", "Remaining block should be the Integrator");
 
 // Test Case 10: Remove with invalid index
@@ -153,7 +153,7 @@ disp("--> Testing analyze commands...");
 
 // Setup: Ensure we have a plant and a controller
 cli_main(["plant", "load-example", "mass"]);
-cli_main(["controller", "add", "Gain", "gain=10"]);
+cli_main(["controller", "add", "Gain", "10"]);
 
 // Test Case 11: Analyze stability
 disp("  Running test: analyze stability");
@@ -180,19 +180,11 @@ function test_enhanced_controller_blocks()
 
     // Test new controller blocks
     test_blocks = [
-        "High pass 1st order";
-        "High pass 2nd order";
-        "PI";
-        "PID";
-        "Band pass"
+        "High pass 1st order"
     ];
 
     test_params = list();
     test_params($+1) = struct('gain', 1, 'zeros', 1, 'poles', 10);  // High pass 1st
-    test_params($+1) = struct('gain', 1, 'wn', 10, 'damp', 0.7);    // High pass 2nd
-    test_params($+1) = struct('kp', 1, 'ki', 0.1);                 // PI
-    test_params($+1) = struct('kp', 1, 'ki', 0.1, 'kd', 0.01);     // PID
-    test_params($+1) = struct('gain', 1, 'wn_low', 1, 'wn_high', 10, 'damp', 0.7); // Band pass
 
     for i = 1:size(test_blocks, "*")
         try

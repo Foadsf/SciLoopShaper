@@ -3,9 +3,8 @@
 function cli_execute_command(parsed_command)
     // This function is the main command dispatcher.
     global CLI_STATE;
-    disp("--- cli_execute_command (simplified) ---");
 
-    // select parsed_command.command
+    select parsed_command.command
     case "plant"
         cli_handle_plant_command(parsed_command);
     case "controller"
@@ -13,31 +12,24 @@ function cli_execute_command(parsed_command)
     case "analyze"
         cli_handle_analysis_command(parsed_command);
     else
-    //     error("Unknown command: " + parsed_command.command);
-    // end
+        error("Unknown command: " + parsed_command.command);
+    end
 endfunction
+
 
 function cli_handle_plant_command(parsed_command)
     // This function handles all sub-commands for the 'plant' command.
     global CLI_STATE;
 
-    disp("--- Inside plant command handler ---");
-    disp("Type of args: " + typeof(parsed_command.args));
-    disp("Length of args: " + string(length(parsed_command.args)));
-
-    select parsed_command.sub_command
+    select parsed_command.subcommand
     case "load-workspace"
-        // Check for correct number of arguments
         if size(parsed_command.args, "*") <> 1 then
             error("Usage: plant load-workspace <VARIABLE_NAME>");
         end
         var_name = parsed_command.args(1);
-        disp("Loading plant from workspace variable: " + var_name);
         try
-            // Call the core function
             CLI_STATE.plant = load_plant_from_workspace(var_name);
             disp("Plant loaded successfully.");
-            disp(CLI_STATE.plant);
         catch
             error("Failed to load plant from workspace: " + lasterror());
         end
@@ -47,18 +39,17 @@ function cli_handle_plant_command(parsed_command)
             error("Usage: plant load-example {mass|2-mass-collocated|2-mass-non-collocated}");
         end
         example_name = parsed_command.args(1);
-        // Validate example name
         valid_examples = ["mass", "2-mass-collocated", "2-mass-non-collocated"];
         if ~or(valid_examples == example_name) then
-             error("Invalid example name. Must be one of: " + strjoin(valid_examples, ", "));
+            valid_examples_str = "";
+            for i = 1:size(valid_examples, "*")
+                valid_examples_str = valid_examples_str + valid_examples(i) + ", ";
+            end
+            error("Invalid example name. Must be one of: " + valid_examples_str);
         end
-
-        disp("Loading example plant: " + example_name);
         try
-            // Call the core function
             CLI_STATE.plant = create_example_plant(example_name);
             disp("Example plant loaded successfully.");
-            disp(CLI_STATE.plant);
         catch
             error("Failed to create example plant: " + lasterror());
         end
@@ -71,9 +62,8 @@ function cli_handle_plant_command(parsed_command)
             disp(CLI_STATE.plant);
         end
 
-    // ... other plant sub-commands
     else
-        error("Unknown plant command: " + parsed_command.sub_command);
+        error("Unknown plant command: " + parsed_command.subcommand);
     end
 endfunction
 
@@ -81,7 +71,7 @@ endfunction
 function cli_handle_controller_command(parsed_command)
     global CLI_STATE;
 
-    select parsed_command.sub_command
+    select parsed_command.subcommand
     case "list"
         if isempty(CLI_STATE.controller) then
             disp("No controller blocks have been added.");
@@ -100,19 +90,24 @@ function cli_handle_controller_command(parsed_command)
 
     case "add"
         if size(parsed_command.args, "*") < 2 then
-            error("Usage: controller add <BLOCK_TYPE> [param=value...]");
+            error("Usage: controller add <BLOCK_TYPE> [PARAMETERS...]");
         end
         blockType = parsed_command.args(1);
         params = struct();
 
-        for i = 2:size(parsed_command.args, "*")
-            parts = strsplit(parsed_command.args(i), '=');
-            if length(parts) <> 2 then
-                error("Invalid parameter format. Use param=value.");
+        select blockType
+        case "Gain"
+            if size(parsed_command.args, "*") <> 2 then
+                error("Usage: controller add Gain <gain_value>");
             end
-            key = parts(1);
-            value = evstr(parts(2));
-            params(key) = value;
+            params.gain = evstr(parsed_command.args(2));
+        case "Integrator"
+            if size(parsed_command.args, "*") <> 2 then
+                error("Usage: controller add Integrator <gain_value>");
+            end
+            params.gain = evstr(parsed_command.args(2));
+        else
+            error("Unsupported block type for ''add'' command: " + blockType);
         end
 
         try
@@ -142,7 +137,7 @@ function cli_handle_controller_command(parsed_command)
         disp("Removed block at index: " + index_str);
 
     else
-        error("Unknown controller command: " + parsed_command.sub_command);
+        error("Unknown controller command: " + parsed_command.subcommand);
     end
 endfunction
 
@@ -150,24 +145,45 @@ endfunction
 function cli_handle_analysis_command(parsed_command)
     global CLI_STATE;
 
-    select parsed_command.sub_command
+    select parsed_command.subcommand
     case "stability"
-        handle_analyze_stability(parsed_command.args, parsed_command.command_options);
+        handle_analyze_stability(parsed_command.args, parsed_command.options);
     case "frequency-response"
-        handle_analyze_frequency_response(parsed_command.args, parsed_command.command_options);
+        handle_analyze_frequency_response(parsed_command.args, parsed_command.options);
     case "time-response"
-        handle_analyze_time_response(parsed_command.args, parsed_command.command_options);
+        handle_analyze_time_response(parsed_command.args, parsed_command.options);
     case "margins"
-        handle_analyze_margins(parsed_command.args, parsed_command.command_options);
+        handle_analyze_margins(parsed_command.args, parsed_command.options);
     else
-        error("Unknown analyze subcommand: " + parsed_command.sub_command);
+        error("Unknown analyze subcommand: " + parsed_command.subcommand);
     end
 endfunction
 
 
 function handle_analyze_stability(args, options)
+    // FIXED VERSION - Safe global variable access
     global CLI_STATE;
-    disp("--- handle_analyze_stability ---");
+
+    // Method 1: Check if global exists
+    if ~exists('CLI_STATE', 'global') then
+        cli_error("CLI system not initialized");
+        return;
+    end
+
+    // Method 2: Check if field exists
+    if ~isfield(CLI_STATE, 'plant') then
+        cli_error("Plant field not initialized");
+        return;
+    end
+
+    // Method 3: Safe empty check - use explicit comparison instead of isempty()
+    if CLI_STATE.plant == [] then
+        cli_error("No plant loaded. Use ''plant load-*'' commands first.");
+        return;
+    end
+
+    // Rest of your function logic here...
+    disp("Analyze stability: Plant is loaded, proceeding with analysis");
 endfunction
 
 
