@@ -12,8 +12,7 @@ function cli_execute_command(parsed_command)
     case "plant"
         cli_handle_plant_command(parsed_command);
     case "controller"
-        // TODO: cli_handle_controller_command(parsed_command);
-        disp("Controller commands not implemented yet.");
+        cli_handle_controller_command(parsed_command);
     case "analyze"
         // TODO: cli_handle_analysis_command(parsed_command);
         disp("Analysis commands not implemented yet.");
@@ -81,5 +80,86 @@ function cli_handle_plant_command(parsed_command)
     // ... other plant sub-commands
     else
         error("Unknown plant command: " + parsed_command.sub_command);
+    end
+endfunction
+
+
+function cli_handle_controller_command(parsed_command)
+    // This function handles all sub-commands for the 'controller' command.
+    global CLI_STATE;
+
+    // disp("Controller command handler is temporarily disabled for debugging.");
+
+    select parsed_command.sub_command
+    case "list"
+        if isempty(CLI_STATE.controller) then
+            disp("No controller blocks have been added.");
+            return;
+        end
+        disp("Current Controller Blocks:");
+        for i = 1:length(CLI_STATE.controller)
+            block = CLI_STATE.controller(i);
+            // Convert params struct to a string for display
+            param_str = "";
+            fields = fieldnames(block.params);
+            for j = 1:length(fields)
+                param_str = param_str + fields(j) + "=" + string(block.params(fields(j))) + " ";
+            end
+            disp(string(i) + ": " + block.type + " (" + param_str + ")");
+        end
+
+    case "add"
+        if length(parsed_command.args) < 2 then
+            error("Usage: controller add <BLOCK_TYPE> [param=value...]");
+        end
+        blockType = parsed_command.args(1);
+        params = struct();
+
+        // Simple parameter parsing for now (e.g., gain=10)
+        for i = 2:length(parsed_command.args)
+            parts = strsplit(parsed_command.args(i), '=');
+            if length(parts) <> 2 then
+                error("Invalid parameter format. Use param=value.");
+            end
+            key = parts(1);
+            value = evstr(parts(2)); // Use evstr to convert string to number
+            params(key) = value;
+        end
+
+        try
+            new_block = create_controller_block(blockType, params);
+            if isempty(CLI_STATE.controller) then
+                CLI_STATE.controller = list(new_block);
+            else
+                CLI_STATE.controller($+1) = new_block;
+            end
+            disp("Added new block: " + blockType);
+        catch
+            error("Failed to add controller block: " + lasterror());
+        end
+
+    case "remove"
+        if length(parsed_command.args) <> 1 then
+            error("Usage: controller remove <BLOCK_INDEX>");
+        end
+        index_str = parsed_command.args(1);
+        index = evstr(index_str); // Convert string to number
+
+        if isempty(index) | type(index) <> 1 | index < 1 | index > length(CLI_STATE.controller) then
+            error("Invalid block index.");
+        end
+
+        // Remove the block from the list
+        CLI_STATE.controller(index) = [];
+        disp("Removed block at index: " + index_str);
+
+    // case "set-params"
+    //     disp("'controller set-params' command called.");
+    //     // TODO: Implement logic to set controller parameters.
+    // case "calculate"
+    //     disp("'controller calculate' command called.");
+    //     // TODO: Implement logic to calculate the combined controller.
+    else
+        error("Unknown controller command: " + parsed_command.sub_command);
     end
 endfunction

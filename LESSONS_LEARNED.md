@@ -101,6 +101,26 @@ Migrating development practices or replicating tools from MATLAB to Scilab invol
         *   Use `delete(handle.children)` to clear axes content. Add `if ~isempty(handle.children)` check before deleting.
         *   Use `drawnow()` after plotting or changing titles/properties within callbacks to force the GUI to refresh visually.
 
+## CLI Development and Execution (Scilab 2024.0.0)
+
+1.  **Headless Script Execution (`scilab-cli`)**
+    *   **Problem:** Running test scripts from the command line using `scilab -nw -f my_script.sce` failed with errors related to missing display variables (`$DISPLAY`) and TCL/TK initialization, even with the `-nw` (no window) flag.
+    *   **Scilab Solution:** The standard `scilab` executable, even with `-nw`, still attempts to initialize some GUI components. For true headless or non-interactive execution (e.g., in a Docker container, CI/CD pipeline, or for a CLI tool), the `scilab-cli` executable must be used.
+    *   **Usage:** `scilab-cli -f my_script.sce`. This avoids all GUI-related initializations and errors.
+
+2.  **String Function Availability (`startsWith`)**
+    *   **Problem:** The `startsWith` function, common in many languages, is not a built-in core function in Scilab and resulted in an "Undefined variable" error.
+    *   **Scilab Solution:** Use the `strindex(haystack, needle)` function. A robust check for whether a string starts with a substring is `strindex(str, sub) == 1`.
+
+3.  **Logical vs. Bitwise Operators (`&&` vs. `&`)**
+    *   **Problem:** A condition like `if ~isempty(x) & x(1) == 1 then` caused an "Invalid index" error when `x` was an empty matrix.
+    *   **Diagnosis:** The `&` operator is an element-wise (bitwise) operator and does not short-circuit. It evaluates both sides of the condition regardless of the outcome of the first part.
+    *   **Scilab Solution:** Use the `&&` operator for logical conditions that require short-circuiting. The correct, safe syntax is `if ~isempty(x) && x(1) == 1 then`.
+
+4.  **Debugging `Invalid index` Errors**
+    *   **Problem:** An "Invalid index" error persisted despite the code appearing logically correct.
+    *   **Debugging Strategy:** A highly effective strategy was to replace the entire function causing the error with a "dummy" version that returned a hard-coded, valid result. This allowed the rest of the application to be tested. When the rest of the application worked, it proved definitively that the bug was inside the original function, narrowing the search space considerably.
+
 ## General Advice
 
 *   **Assume Differences:** Don't assume MATLAB functions or syntax work directly in Scilab.

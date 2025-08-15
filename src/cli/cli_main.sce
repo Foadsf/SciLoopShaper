@@ -2,7 +2,7 @@
 
 // Initialize a global state for the CLI session
 global CLI_STATE;
-CLI_STATE = struct("plant", [], "controller", [], "config", struct());
+CLI_STATE = struct("plant", [], "controller", list(), "config", struct());
 
 
 function cli_main(args)

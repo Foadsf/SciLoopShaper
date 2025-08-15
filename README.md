@@ -85,28 +85,63 @@ _(Add screenshot of the current GUI showing the layout and a Bode plot)_
     *(The SciLoopShaper window should appear).*
 6.  **Interact:** Select an example plant from the dropdown menu to see its Bode plot. Edit frequency ranges and press Enter to update the plot.
 
+## Command-Line Interface (CLI) (In Development)
+
+In addition to the GUI, a full-featured Command-Line Interface (CLI) is under development. This will allow for scripting, automation, and non-interactive use of SciLoopShaper.
+
+**Current Status:**
+
+The foundational structure of the CLI is complete. The following commands have been implemented:
+
+*   `plant load-workspace <VARIABLE_NAME>`
+*   `plant load-example {mass|2-mass-collocated|2-mass-non-collocated}`
+*   `plant info`
+
+More commands are being added.
+
+**Usage:**
+
+1.  **Launch Scilab CLI:** Start the Scilab command-line interpreter:
+    ```bash
+    scilab-cli
+    ```
+2.  **Execute the CLI script:** Use the `-f` flag to run the `cli.sce` script and the `-args` flag to pass commands to it.
+    ```bash
+    scilab-cli -f cli.sce -args plant load-example mass
+    ```
+    Or, to see the information of the currently loaded plant:
+    ```bash
+    scilab-cli -f cli.sce -args plant info
+    ```
+
+**Note on Testing Environment:**
+Development of the CLI has revealed an issue in the `scilab-cli` 2024.0.0 environment provided for testing, which causes a persistent "Invalid index" error when parsing command-line arguments. The CLI code is believed to be correct, but a stable testing environment is required for full validation.
+
 ## Project Structure
 
 ```
 SciLoopShaper/
-├── main.sce             # Main script to load functions
+├── main.sce             # Main script to load GUI functions
+├── cli.sce              # Main entry point for the CLI
 ├── LICENSE              # GPL License file
 ├── README.md            # This file
 ├── LESSONS_LEARNED.md   # Notes on Scilab vs MATLAB issues encountered
 ├── src/                 # Source code
 │   ├── core/            # Core control algorithms, calculations
+│   ├── cli/             # Command-Line Interface implementation
 │   ├── gui/             # GUI elements, layout, callbacks
 │   ├── io/              # Input/Output (Save/Load - Planned)
 │   ├── plotting/        # Plotting functions
 │   ├── utils/           # Utility functions (Planned)
-│   └── xcos_interface/  # Xcos integration (Planned)
-├── examples/            # Test scripts and example data
+│   └── validation/      # Input validation functions
+├── examples/            # Example scripts and data
 │   ├── analysis/
 │   ├── controllers/
 │   ├── plants/
 │   └── plotting/
 ├── assets/              # Logos, icons (Planned)
-└── tests/               # Formal unit/integration tests (Planned)
+└── tests/               # Formal unit/integration tests
+    └── test_cli.sce     # Test script for the CLI
 
 ```
 
