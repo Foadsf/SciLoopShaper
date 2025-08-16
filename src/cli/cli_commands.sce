@@ -84,7 +84,7 @@ function cli_handle_controller_command(parsed_command)
             param_str = "";
             fields = fieldnames(block.params);
             for j = 1:length(fields)
-                param_str = param_str + fields(j) + "=" + string(getfield(fields(j), block.params)) + " ";
+                param_str = param_str + fields(j) + "=" + string(block.params.(fields(j))) + " ";
             end
             disp(string(i) + ": " + block.type + " (" + param_str + ")");
         end
