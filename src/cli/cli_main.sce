@@ -9,6 +9,9 @@ CLI_STATE = struct(..
     "freq", struct("min", 0.01, "max", 1000, "points", 1000) ..
 );
 
+global CLI_ERROR_STATE;
+CLI_ERROR_STATE = struct("has_error", %F, "message", "");
+
 
 function cli_main(args)
     // This is the main entry point for the CLI logic.

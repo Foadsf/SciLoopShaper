@@ -20,6 +20,7 @@ endfunction
 function cli_handle_plant_command(parsed_command)
     // This function handles all sub-commands for the 'plant' command.
     global CLI_STATE;
+    global CLI_ERROR_STATE;
 
     select parsed_command.subcommand
     case "load-workspace"
@@ -45,7 +46,10 @@ function cli_handle_plant_command(parsed_command)
             for i = 1:size(valid_examples, "*")
                 valid_examples_str = valid_examples_str + valid_examples(i) + ", ";
             end
-            error("Invalid example name. Must be one of: " + valid_examples_str);
+            disp("Setting error state for invalid example name.");
+            CLI_ERROR_STATE.has_error = %T;
+            CLI_ERROR_STATE.message = "Invalid example name. Must be one of: " + valid_examples_str;
+            return;
         end
         try
             CLI_STATE.plant = create_example_plant(example_name);
@@ -70,6 +74,7 @@ endfunction
 
 function cli_handle_controller_command(parsed_command)
     global CLI_STATE;
+    global CLI_ERROR_STATE;
 
     select parsed_command.subcommand
     case "list"
@@ -82,7 +87,7 @@ function cli_handle_controller_command(parsed_command)
         for i = 1:length(CLI_STATE.controller)
             block = CLI_STATE.controller(i);
             param_str = "";
-            fields = getfield(1, block.params);
+            fields = fieldnames(block.params);
             for j = 1:size(fields, "*")
                 param_str = param_str + fields(j) + "=" + string(block.params.(fields(j))) + " ";
             end
@@ -131,7 +136,9 @@ function cli_handle_controller_command(parsed_command)
         index = evstr(index_str);
 
         if isempty(index) | type(index) <> 1 | index < 1 | length(CLI_STATE.controller) == 0 | index > length(CLI_STATE.controller) then
-            error("Invalid block index.");
+            CLI_ERROR_STATE.has_error = %T;
+            CLI_ERROR_STATE.message = "Invalid block index.";
+            return;
         end
 
         CLI_STATE.controller(index) = null();

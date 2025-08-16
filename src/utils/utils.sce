@@ -11,8 +11,10 @@ function [val] = get_option(options, option_name, default_value)
 endfunction
 
 function cli_error(message)
-    // Placeholder for error message formatting
-    error(message);
+    global CLI_ERROR_STATE;
+    CLI_ERROR_STATE.has_error = %T;
+    CLI_ERROR_STATE.message = message;
+    disp("ERROR: " + message);
 endfunction
 
 function cli_warning(message)

@@ -4,6 +4,8 @@
 // --- Test Setup ---
 disp("--- Running CLI Test Suite ---");
 
+global CLI_ERROR_STATE;
+
 // The project root is the current working directory.
 currentPath = pwd();
 disp("Calculated project root: " + currentPath);
@@ -90,14 +92,10 @@ assert_true(~isempty(CLI_STATE.plant) & isequal(CLI_STATE.plant, my_test_plant),
 
 // Test Case 4: Invalid example name
 disp("  Running test: plant load-example invalid_name");
-// This should produce an error. We can use try/catch to verify this.
-should_error = %F;
-try
-    cli_main(["plant", "load-example", "invalid_name"]);
-catch
-    should_error = %T;
-end
-assert_true(should_error, "Should error on invalid example name");
+CLI_ERROR_STATE.has_error = %F; // Reset before test
+cli_main(["plant", "load-example", "invalid_name"]);
+disp("Error state after call: " + string(CLI_ERROR_STATE.has_error));
+assert_true(CLI_ERROR_STATE.has_error, "Should error on invalid example name");
 
 
 // --- Test Cases for Controller ---
@@ -138,13 +136,9 @@ assert_true(CLI_STATE.controller(1).type == "Integrator", "Remaining block shoul
 
 // Test Case 10: Remove with invalid index
 disp("  Running test: controller remove 99 (invalid)");
-should_error = %F;
-try
-    cli_main(["controller", "remove", "99"]);
-catch
-    should_error = %T;
-end
-assert_true(should_error, "Should error on invalid remove index");
+CLI_ERROR_STATE.has_error = %F; // Reset before test
+cli_main(["controller", "remove", "99"]);
+assert_true(CLI_ERROR_STATE.has_error, "Should error on invalid remove index");
 
 
 // --- Test Cases for Analyze ---
