@@ -170,6 +170,11 @@ disp("  Running test: analyze time-response step");
 cli_main(["analyze", "time-response", "step"]);
 assert_true(%T, "analyze time-response should run without error");
 
+// Test Case 15: Analyze margins
+disp("  Running test: analyze margins");
+cli_main(["analyze", "margins"]);
+assert_true(%T, "analyze margins should run without error");
+
 
 // --- Test Cases for Enhanced Core Features ---
 function test_enhanced_controller_blocks()

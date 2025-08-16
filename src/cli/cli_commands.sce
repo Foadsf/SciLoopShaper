@@ -329,5 +329,36 @@ endfunction
 
 function handle_analyze_margins(args, options)
     global CLI_STATE;
-    disp("--- handle_analyze_margins ---");
+
+    // Safety checks (same pattern)
+    if ~isdef('CLI_STATE', 'n') then
+        cli_error("CLI system not initialized");
+        return;
+    end
+
+    if CLI_STATE.plant == [] then
+        cli_error("No plant loaded. Use ''plant load-*'' commands first.");
+        return;
+    end
+
+    try
+        // Get controller or use unity gain
+        if length(CLI_STATE.controller) > 0 then
+            controller = calculate_controller(CLI_STATE.controller);
+        else
+            controller = syslin('c', 1, 1);
+        end
+
+        // Reuse stability analysis
+        results = analyze_stability(CLI_STATE.plant, controller);
+
+        // Display only margins (focused output)
+        disp("=== Stability Margins ===");
+        disp("Gain Margin: " + string(results.gain_margin) + " dB");
+        disp("Phase Margin: " + string(results.phase_margin) + " deg");
+        disp("Bandwidth: " + string(results.bandwidth) + " Hz");
+
+    catch
+        disp("Error during margin analysis: " + lasterror());
+    end
 endfunction
