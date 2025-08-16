@@ -82,8 +82,8 @@ function cli_handle_controller_command(parsed_command)
         for i = 1:length(CLI_STATE.controller)
             block = CLI_STATE.controller(i);
             param_str = "";
-            fields = fieldnames(block.params);
-            for j = 1:length(fields)
+            fields = getfield(1, block.params);
+            for j = 1:size(fields, "*")
                 param_str = param_str + fields(j) + "=" + string(block.params.(fields(j))) + " ";
             end
             disp(string(i) + ": " + block.type + " (" + param_str + ")");
