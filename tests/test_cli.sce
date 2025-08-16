@@ -165,6 +165,11 @@ disp("  Running test: analyze frequency-response --plot-type bode");
 // cli_main(["analyze", "frequency-response", "--plot-type", "bode"]);
 // assert_true(%T, "analyze frequency-response with plot type should run without error");
 
+// Test Case 14: Analyze time response
+disp("  Running test: analyze time-response step");
+cli_main(["analyze", "time-response", "step"]);
+assert_true(%T, "analyze time-response should run without error");
+
 
 // --- Test Cases for Enhanced Core Features ---
 function test_enhanced_controller_blocks()

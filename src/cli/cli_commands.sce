@@ -86,12 +86,10 @@ function cli_handle_controller_command(parsed_command)
         disp("Type of controller list: " + typeof(CLI_STATE.controller));
         for i = 1:length(CLI_STATE.controller)
             block = CLI_STATE.controller(i);
-            param_str = "";
-            fields = fieldnames(block.params);
-            for j = 1:size(fields, "*")
-                param_str = param_str + fields(j) + "=" + string(block.params.(fields(j))) + " ";
-            end
-            disp(string(i) + ": " + block.type + " (" + param_str + ")");
+            disp("  Block " + string(i) + ":");
+            disp("    Type: " + block.type);
+            disp("    Parameters:");
+            disp(block.params);
         end
 
     case "add"
@@ -169,42 +167,163 @@ endfunction
 
 
 function handle_analyze_stability(args, options)
-    // Working on fixing this function
-    // FIXED VERSION - Safe global variable access
     global CLI_STATE;
 
-    // Method 1: Check if global exists
+    // Existing safety checks (keep these)
     if ~isdef('CLI_STATE', 'n') then
         cli_error("CLI system not initialized");
         return;
     end
 
-    // Method 2: Check if field exists
     if ~isfield(CLI_STATE, 'plant') then
         cli_error("Plant field not initialized");
         return;
     end
 
-    // Method 3: Safe empty check - use explicit comparison instead of isempty()
     if CLI_STATE.plant == [] then
         cli_error("No plant loaded. Use ''plant load-*'' commands first.");
         return;
     end
 
-    // Rest of your function logic here...
-    disp("Analyze stability: Plant is loaded, proceeding with analysis");
+    // NEW: Real stability analysis
+    try
+        // Get controller or use unity gain if none
+        if length(CLI_STATE.controller) > 0 then
+            controller = calculate_controller(CLI_STATE.controller);
+        else
+            controller = syslin('c', 1, 1); // Unity gain
+        end
+
+        // Perform stability analysis using existing core function
+        results = analyze_stability(CLI_STATE.plant, controller);
+
+        // Display results
+        disp("=== Stability Analysis Results ===");
+        disp("System Stable: " + string(results.stable));
+        disp("Gain Margin: " + string(results.gain_margin) + " dB");
+        disp("Phase Margin: " + string(results.phase_margin) + " deg");
+        disp("Bandwidth: " + string(results.bandwidth) + " Hz");
+
+    catch
+        disp("Error during stability analysis: " + lasterror());
+    end
 endfunction
 
 
 function handle_analyze_frequency_response(args, options)
     global CLI_STATE;
-    disp("--- handle_analyze_frequency_response ---");
+
+    // Safety checks (same pattern as stability)
+    if ~isdef('CLI_STATE', 'n') then
+        cli_error("CLI system not initialized");
+        return;
+    end
+
+    if CLI_STATE.plant == [] then
+        cli_error("No plant loaded. Use ''plant load-*'' commands first.");
+        return;
+    end
+
+    try
+        // Get system for analysis
+        if length(CLI_STATE.controller) > 0 then
+            sys = CLI_STATE.plant * calculate_controller(CLI_STATE.controller);
+        else
+            sys = CLI_STATE.plant;
+        end
+
+        // Calculate frequency response
+        [mag, phase, w] = calculate_frequency_response(sys, CLI_STATE.freq.min, CLI_STATE.freq.max, CLI_STATE.freq.points);
+
+        // Display summary
+        disp("=== Frequency Response Analysis ===");
+        disp("Frequency range: " + string(w(1)) + " to " + string(w($)) + " Hz");
+        disp("Number of points: " + string(length(w)));
+
+        // Find key characteristics
+        mag_db = 20*log10(mag + 1e-12);
+        max_mag = max(mag_db);
+        min_mag = min(mag_db);
+
+        disp("Magnitude range: " + string(min_mag) + " to " + string(max_mag) + " dB");
+
+    catch
+        disp("Error during frequency response analysis: " + lasterror());
+    end
 endfunction
 
 
 function handle_analyze_time_response(args, options)
     global CLI_STATE;
-    disp("--- handle_analyze_time_response ---");
+
+    // Safety checks
+    if ~isdef('CLI_STATE', 'n') then
+        cli_error("CLI system not initialized");
+        return;
+    end
+
+    if CLI_STATE.plant == [] then
+        cli_error("No plant loaded. Use ''plant load-*'' commands first.");
+        return;
+    end
+
+    // Parse input type argument
+    if length(args) < 1 then
+        disp("Error: time-response requires input type: {step|impulse|sine}");
+        return;
+    end
+
+    input_type = args(1);
+    valid_inputs = ["step", "impulse", "sine"];
+    if ~or(input_type == valid_inputs) then
+        disp("Error: Invalid input type. Use: step, impulse, or sine");
+        return;
+    end
+
+    try
+        // Get controller or use unity gain
+        if length(CLI_STATE.controller) > 0 then
+            controller = calculate_controller(CLI_STATE.controller);
+        else
+            controller = syslin('c', 1, 1);
+        end
+
+        // Create time vector
+        duration = 5.0;  // Default 5 seconds
+        points = 500;    // Default 500 points
+        time_vector = linspace(0, duration, points);
+
+        // Calculate time response
+        if input_type == "step" then
+            resp = calculate_time_response(CLI_STATE.plant, controller, "step", time_vector);
+
+            // Calculate step response metrics
+            final_value = resp($);
+            max_value = max(resp);
+            overshoot = (max_value - final_value) / abs(final_value) * 100;
+
+            disp("=== Step Response Analysis ===");
+            disp("Final value: " + string(final_value));
+            disp("Peak value: " + string(max_value));
+            disp("Overshoot: " + string(overshoot) + "%");
+
+        elseif input_type == "impulse" then
+            // For impulse response, use derivative of step
+            resp = calculate_time_response(CLI_STATE.plant, controller, "step", time_vector);
+            // Simple numerical derivative
+            impulse_resp = [0; diff(resp)];
+
+            disp("=== Impulse Response Analysis ===");
+            disp("Peak impulse response: " + string(max(abs(impulse_resp))));
+
+        else  // sine
+            disp("=== Sine Response Analysis ===");
+            disp("Sine response analysis not yet implemented");
+        end
+
+    catch
+        disp("Error during time response analysis: " + lasterror());
+    end
 endfunction
 
 
