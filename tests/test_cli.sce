@@ -115,14 +115,14 @@ assert_true(isempty(CLI_STATE.controller), "Controller list should be initially 
 // Test Case 6: Add a Gain block
 disp("  Running test: controller add Gain 10");
 cli_main(["controller", "add", "Gain", "10"]);
-assert_true(size(CLI_STATE.controller, "*") == 1, "Controller list should have 1 block after add");
+assert_true(length(CLI_STATE.controller) == 1, "Controller list should have 1 block after add");
 assert_true(CLI_STATE.controller(1).type == "Gain", "Block type should be Gain");
 assert_true(CLI_STATE.controller(1).params.gain == 10, "Block gain should be 10");
 
 // Test Case 7: Add an Integrator block
 disp("  Running test: controller add Integrator 2.5");
 cli_main(["controller", "add", "Integrator", "2.5"]);
-assert_true(size(CLI_STATE.controller, "*") == 2, "Controller list should have 2 blocks after second add");
+assert_true(length(CLI_STATE.controller) == 2, "Controller list should have 2 blocks after second add");
 assert_true(CLI_STATE.controller(2).type == "Integrator", "Second block type should be Integrator");
 
 // Test Case 8: List non-empty controller
@@ -133,7 +133,7 @@ assert_true(%T, "controller list should run without error");
 // Test Case 9: Remove a block
 disp("  Running test: controller remove 1");
 cli_main(["controller", "remove", "1"]);
-assert_true(size(CLI_STATE.controller, "*") == 1, "Controller list should have 1 block after remove");
+assert_true(length(CLI_STATE.controller) == 1, "Controller list should have 1 block after remove");
 assert_true(CLI_STATE.controller(1).type == "Integrator", "Remaining block should be the Integrator");
 
 // Test Case 10: Remove with invalid index

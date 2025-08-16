@@ -78,12 +78,13 @@ function cli_handle_controller_command(parsed_command)
             return;
         end
         disp("Current Controller Blocks:");
-        for i = 1:size(CLI_STATE.controller, "*")
+        disp("Type of controller list: " + typeof(CLI_STATE.controller));
+        for i = 1:length(CLI_STATE.controller)
             block = CLI_STATE.controller(i);
             param_str = "";
             fields = fieldnames(block.params);
             for j = 1:length(fields)
-                param_str = param_str + fields(j) + "=" + string(block.params(fields(j))) + " ";
+                param_str = param_str + fields(j) + "=" + string(block.params.(fields(j))) + " ";
             end
             disp(string(i) + ": " + block.type + " (" + param_str + ")");
         end
@@ -129,11 +130,11 @@ function cli_handle_controller_command(parsed_command)
         index_str = parsed_command.args(1);
         index = evstr(index_str);
 
-        if isempty(index) | type(index) <> 1 | index < 1 | size(CLI_STATE.controller, "*") == 0 | index > size(CLI_STATE.controller, "*") then
+        if isempty(index) | type(index) <> 1 | index < 1 | length(CLI_STATE.controller) == 0 | index > length(CLI_STATE.controller) then
             error("Invalid block index.");
         end
 
-        CLI_STATE.controller(index) = [];
+        CLI_STATE.controller(index) = null();
         disp("Removed block at index: " + index_str);
 
     else
@@ -161,11 +162,12 @@ endfunction
 
 
 function handle_analyze_stability(args, options)
+    // Working on fixing this function
     // FIXED VERSION - Safe global variable access
     global CLI_STATE;
 
     // Method 1: Check if global exists
-    if ~exists('CLI_STATE', 'global') then
+    if ~isdef('CLI_STATE', 'n') then
         cli_error("CLI system not initialized");
         return;
     end
